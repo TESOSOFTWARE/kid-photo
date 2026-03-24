@@ -184,8 +184,8 @@ const PhotoEditor = ({ kidProfiles }) => {
     // NAME Line (e.g. "Nick * 1y7m & Bee * 3y")
     if (overlays.showName && kidProfiles.length > 0) {
       const nameText = kidProfiles
-        .filter(kid => !overlays.hiddenNames.includes(kid.id))
-        .map(kid => {
+        .filter((kid, index) => !overlays.hiddenNames.includes(index))
+        .map((kid, index) => {
           const n = kid.nickname || kid.name;
           if (!n) return null;
           if (kid.dob && photoDate) {
@@ -538,16 +538,16 @@ const PhotoEditor = ({ kidProfiles }) => {
             
             {overlays.showName && kidProfiles.length > 0 && (
               <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                {kidProfiles.map(kid => (
-                  <label key={kid.id} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                {kidProfiles.map((kid, index) => (
+                  <label key={index} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                     <input 
                       type="checkbox" 
-                      checked={!overlays.hiddenNames.includes(kid.id)}
+                      checked={!overlays.hiddenNames.includes(index)}
                       onChange={(e) => {
                         saveHistory();
                         const hidden = e.target.checked 
-                          ? overlays.hiddenNames.filter(id => id !== kid.id)
-                          : [...overlays.hiddenNames, kid.id];
+                          ? overlays.hiddenNames.filter(idx => idx !== index)
+                          : [...overlays.hiddenNames, index];
                         setOverlays({...overlays, hiddenNames: hidden});
                       }}
                     /> {kid.nickname || kid.name}
