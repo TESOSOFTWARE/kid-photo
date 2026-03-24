@@ -159,10 +159,10 @@ const PhotoEditor = ({ kidProfiles }) => {
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (!selected.length) return;
+    const oldLength = files.length;
+    setFiles(prev => [...prev, ...selected]);
+    setCurrentIndex(oldLength); // Jump to first new file
     e.target.value = ''; // reset input
-    setFiles(selected);
-    setCurrentIndex(0);
-    setCache({});
   };
 
   const currentData = cache[currentIndex] || {};
@@ -170,13 +170,15 @@ const PhotoEditor = ({ kidProfiles }) => {
   const currentPositions = photoOverrides[currentIndex]?.positions || positions;
   const currentScales = photoOverrides[currentIndex]?.scales || scales;
   const currentRotations = photoOverrides[currentIndex]?.rotations || rotations;
+  const currentFontSize = photoOverrides[currentIndex]?.fontSize || overlays.fontSize;
   const currentCustomLoc = photoOverrides[currentIndex]?.customLocation;
 
-  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, customLoc) => {
+  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, fsz, customLoc) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
     
     const ratio = Math.min(2000 / img.width, 1);
-    const baseFontSize = overlays.fontSize * ratio;
+    const baseFontSize = fsz * ratio;
+    const stickerBaseSize = 40 * ratio; // Fixed base for stickers
     const newHitBoxes = {};
 
     ctx.fillStyle = overlays.color;
@@ -273,7 +275,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       const iconType = iconObj.type || iconObj;
       const iconText = iconMap[iconType];
       if (!iconText) return;
-      const fs = baseFontSize * 6 * (scl[iconId] || 1);
+      const fs = stickerBaseSize * 6 * (scl[iconId] || 1);
       ctx.font = `${fs}px serif`;
       // Stagger new instances a bit using the length of selectedIcons, or fallback to center
       const p = pos[iconId] || { x: 0.5 + (Math.random()*0.1 - 0.05), y: 0.5 + (Math.random()*0.1 - 0.05) };
@@ -305,13 +307,13 @@ const PhotoEditor = ({ kidProfiles }) => {
     canvas.width = image.width * ratio;
     canvas.height = image.height * ratio;
 
-    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales, currentRotations, currentCustomLoc);
+    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales, currentRotations, currentFontSize, currentCustomLoc);
     setHitBoxes(hitboxes);
   };
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, currentPositions, currentScales, currentRotations, currentCustomLoc, kidProfiles, metadata]);
+  }, [image, overlays, currentPositions, currentScales, currentRotations, currentFontSize, currentCustomLoc, kidProfiles, metadata]);
 
   /* ── Interaction Logic ── */
   const saveHistory = () => {
@@ -338,8 +340,9 @@ const PhotoEditor = ({ kidProfiles }) => {
   }, [dragging, overlays, photoOverrides, positions, scales, rotations]);
   const updateOverride = (field, updater) => {
     setPhotoOverrides(prev => {
-      const current = prev[currentIndex] || { positions, scales };
-      return { ...prev, [currentIndex]: { ...current, [field]: updater(current[field]) } };
+      const current = prev[currentIndex] || { positions, scales, rotations, fontSize: overlays.fontSize };
+      const newVal = typeof updater === 'function' ? updater(current[field]) : updater;
+      return { ...prev, [currentIndex]: { ...current, [field]: newVal } };
     });
   };
   const hitElement = (clientX, clientY) => {
@@ -421,8 +424,9 @@ const PhotoEditor = ({ kidProfiles }) => {
         const pos = photoOverrides[i]?.positions || positions;
         const scl = photoOverrides[i]?.scales || scales;
         const rot = photoOverrides[i]?.rotations || rotations;
+        const fsz = photoOverrides[i]?.fontSize || overlays.fontSize;
         const loc = photoOverrides[i]?.customLocation;
-        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, loc);
+        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, fsz, loc);
         
         const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
         generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
@@ -552,23 +556,24 @@ const PhotoEditor = ({ kidProfiles }) => {
             </div>
             
             {overlays.showName && kidProfiles.length > 0 && (
-              <div className="overlay-toggle-row" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
                 {kidProfiles.map((kid, index) => {
-                  const isVisible = !overlays.hiddenNames.includes(index);
+                  const name = kid.nickname || kid.name || `Child ${index + 1}`;
+                  const isActive = !overlays.hiddenNames.includes(index);
                   return (
                     <button 
                       key={index}
-                      className={`overlay-toggle ${isVisible ? 'active' : ''}`}
-                      style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                      className={`overlay-toggle ${isActive ? 'active' : ''}`}
                       onClick={() => {
                         saveHistory();
-                        const hidden = !isVisible 
-                          ? overlays.hiddenNames.filter(idx => idx !== index)
-                          : [...overlays.hiddenNames, index];
+                        const hidden = isActive 
+                          ? [...overlays.hiddenNames, index]
+                          : overlays.hiddenNames.filter(idx => idx !== index);
                         setOverlays({...overlays, hiddenNames: hidden});
                       }}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
                     >
-                      {kid.nickname || kid.name || `Kid ${index + 1}`}
+                      {name}
                     </button>
                   );
                 })}
@@ -609,8 +614,8 @@ const PhotoEditor = ({ kidProfiles }) => {
             <label>Size</label>
             <input 
               type="range" min="20" max="150" 
-              value={overlays.fontSize} 
-              onChange={(e) => setOverlays({...overlays, fontSize: parseInt(e.target.value)})} 
+              value={currentFontSize} 
+              onChange={(e) => updateOverride('fontSize', () => parseInt(e.target.value))} 
               onMouseUp={saveHistory}
               onTouchEnd={saveHistory}
             />
@@ -706,14 +711,36 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </button>
               ))}
             </div>
+
             {overlays.selectedIcons.length > 0 && (
-              <button 
-                className="secondary-btn" 
-                onClick={() => { saveHistory(); setOverlays(p => ({ ...p, selectedIcons: [] })); }}
-                style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.85rem' }}
-              >
-                <Trash2 size={14}/> Clear All Stickers
-              </button>
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.4rem', display: 'block' }}>Tap to remove:</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {overlays.selectedIcons.map((s) => {
+                    const iconMap = { heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️', moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸', umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊' };
+                    return (
+                      <button 
+                        key={s.id} 
+                        onClick={() => {
+                          saveHistory();
+                          setOverlays(p => ({ ...p, selectedIcons: p.selectedIcons.filter(x => x.id !== s.id) }));
+                        }} 
+                        className="overlay-toggle active" 
+                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        {iconMap[s.type] || s.type} ✕
+                      </button>
+                    );
+                  })}
+                </div>
+                <button 
+                  className="secondary-btn" 
+                  onClick={() => { saveHistory(); setOverlays(p => ({ ...p, selectedIcons: [] })); }}
+                  style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.82rem', padding: '0.4rem' }}
+                >
+                  <Trash2 size={12}/> Clear All
+                </button>
+              </div>
             )}
           </div>
         </div>
