@@ -4,7 +4,7 @@ import KidProfile from './components/KidProfile'
 import PhotoEditor from './components/PhotoEditor'
 
 function App() {
-  const [kidProfile, setKidProfile] = useState({ name: '', nickname: '', dob: '' });
+  const [kidProfiles, setKidProfiles] = useState([]);
   // 'editor' | 'profile'
   const [mobileTab, setMobileTab] = useState('editor');
 
@@ -19,7 +19,7 @@ function App() {
             <p className="subtitle">Capture every milestone</p>
           </div>
         </header>
-        <KidProfile onProfileChange={setKidProfile} />
+        <KidProfile onProfileChange={setKidProfiles} />
         <div className="sidebar-footer">
           <p>Made for parents by parents ✨</p>
         </div>
@@ -49,12 +49,12 @@ function App() {
 
       {/* Mobile profile tab */}
       <div className={`mobile-profile-view ${mobileTab === 'profile' ? 'visible' : ''}`}>
-        <KidProfile onProfileChange={setKidProfile} />
+        <KidProfile onProfileChange={setKidProfiles} />
       </div>
 
       {/* Main content - always mounted, conditionally visible on mobile */}
       <main className={`main-content ${mobileTab !== 'editor' ? 'mobile-hidden' : ''}`}>
-        <PhotoEditor kidProfile={kidProfile} />
+        <PhotoEditor kidProfiles={kidProfiles} />
       </main>
     </div>
   )

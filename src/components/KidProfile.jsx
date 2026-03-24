@@ -1,60 +1,94 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Calendar, User } from 'lucide-react';
+import { Baby, Calendar, User, Plus, Trash2 } from 'lucide-react';
+import { calculateAge, formatAge } from '../utils/date-utils';
+
+const DEFAULT_CHILD = () => ({ name: '', nickname: '', dob: '' });
 
 const KidProfile = ({ onProfileChange }) => {
-  const [profile, setProfile] = useState(() => {
-    const saved = localStorage.getItem('kid-profile');
+  const [children, setChildren] = useState(() => {
+    const saved = localStorage.getItem('kids-profiles');
     try {
-      return saved ? JSON.parse(saved) : { name: '', nickname: '', dob: '' };
-    } catch (e) {
-      return { name: '', nickname: '', dob: '' };
+      const parsed = saved ? JSON.parse(saved) : null;
+      // Support migrating from old single-profile format
+      if (parsed && Array.isArray(parsed)) return parsed;
+      const old = localStorage.getItem('kid-profile');
+      const oldParsed = old ? JSON.parse(old) : null;
+      return oldParsed ? [oldParsed] : [DEFAULT_CHILD()];
+    } catch {
+      return [DEFAULT_CHILD()];
     }
   });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    const newProfile = { ...profile, [name]: value };
-    setProfile(newProfile);
-    localStorage.setItem('kid-profile', JSON.stringify(newProfile));
-    onProfileChange(newProfile);
+  const save = (updated) => {
+    setChildren(updated);
+    localStorage.setItem('kids-profiles', JSON.stringify(updated));
+    onProfileChange(updated);
   };
 
-  useEffect(() => {
-    onProfileChange(profile);
-  }, []);
+  const handleChange = (index, field, value) => {
+    const updated = children.map((c, i) => i === index ? { ...c, [field]: value } : c);
+    save(updated);
+  };
+
+  const addChild = () => save([...children, DEFAULT_CHILD()]);
+
+  const removeChild = (index) => {
+    if (children.length <= 1) return;
+    save(children.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => { onProfileChange(children); }, []);
 
   return (
     <div className="profile-container">
       <h3>Kid's Profile</h3>
-      <div className="input-group">
-        <label><User size={16} /> Name</label>
-        <input 
-          type="text" 
-          name="name" 
-          value={profile.name} 
-          onChange={handleChange} 
-          placeholder="Enter full name"
-        />
-      </div>
-      <div className="input-group">
-        <label><Baby size={16} /> Nickname</label>
-        <input 
-          type="text" 
-          name="nickname" 
-          value={profile.nickname} 
-          onChange={handleChange} 
-          placeholder="Enter nickname"
-        />
-      </div>
-      <div className="input-group">
-        <label><Calendar size={16} /> Date of Birth</label>
-        <input 
-          type="date" 
-          name="dob" 
-          value={profile.dob} 
-          onChange={handleChange} 
-        />
-      </div>
+
+      {children.map((child, index) => (
+        <div key={index} className="child-card">
+          <div className="child-card-header">
+            <span className="child-label">
+              {children.length > 1 ? `Child ${index + 1}` : ''}
+              {child.nickname || child.name ? ` · ${child.nickname || child.name}` : ''}
+            </span>
+            {children.length > 1 && (
+              <button className="remove-child-btn" onClick={() => removeChild(index)}>
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="input-group">
+            <label><User size={14} /> Name</label>
+            <input
+              type="text"
+              value={child.name}
+              onChange={(e) => handleChange(index, 'name', e.target.value)}
+              placeholder="Full name"
+            />
+          </div>
+          <div className="input-group">
+            <label><Baby size={14} /> Nickname</label>
+            <input
+              type="text"
+              value={child.nickname}
+              onChange={(e) => handleChange(index, 'nickname', e.target.value)}
+              placeholder="e.g. HoneyBee"
+            />
+          </div>
+          <div className="input-group">
+            <label><Calendar size={14} /> Date of Birth</label>
+            <input
+              type="date"
+              value={child.dob}
+              onChange={(e) => handleChange(index, 'dob', e.target.value)}
+            />
+          </div>
+        </div>
+      ))}
+
+      <button className="add-child-btn" onClick={addChild}>
+        <Plus size={16} /> Add another child
+      </button>
     </div>
   );
 };

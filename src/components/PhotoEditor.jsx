@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
 import { calculateAge, formatAge, formatDate } from '../utils/date-utils';
-import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud } from 'lucide-react';
+import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
 
@@ -12,14 +12,19 @@ const CUTE_ICONS = [
   { id: 'cloud', component: Cloud, color: '#339af0' }
 ];
 
-const FONTS = ['Outfit', 'Inter', 'Pacifico', 'Comfortaa', 'Fredoka', 'Sniglet', 'Itim', 'cursive', 'serif'];
+const FONTS = ['Outfit', 'Inter', 'Pacifico', 'Comfortaa', 'Fredoka', 'Sniglet', 'Itim', 'VT323', 'cursive', 'serif'];
 const COLORS = ['#ffffff', '#ff6b6b', '#fcc419', '#339af0', '#51cf66', '#845ef7', '#333333'];
 
-const PhotoEditor = ({ kidProfile }) => {
+const PhotoEditor = ({ kidProfiles }) => {
   const canvasRef = useRef(null);
-  const [image, setImage] = useState(null);
-  const [metadata, setMetadata] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [cache, setCache] = useState({}); // { [index]: { image, metadata, processing } }
+  
   const [loading, setLoading] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+
+  // Global settings for all photos
   const [overlays, setOverlays] = useState({
     showDate: true,
     showLocation: true,
@@ -33,169 +38,188 @@ const PhotoEditor = ({ kidProfile }) => {
   });
 
   // Normalized positions (0.0 to 1.0)
+  // Text relies on a single textGroup for auto-stacking!
   const [positions, setPositions] = useState({
-    name: { x: 0.05, y: 0.85 },
-    date: { x: 0.05, y: 0.90 },
-    location: { x: 0.05, y: 0.95 },
+    textGroup: { x: 0.05, y: 0.85 },
     heart: { x: 0.80, y: 0.15 },
     star: { x: 0.85, y: 0.15 },
     sun: { x: 0.90, y: 0.15 },
     cloud: { x: 0.95, y: 0.15 }
   });
 
-  const [dragging, setDragging] = useState(null);
-  const [hitBoxes, setHitBoxes] = useState({});
-
-  // Per-element scale multiplier (pinch to resize)
   const [scales, setScales] = useState({
-    name: 1, date: 1, location: 1,
-    heart: 1, star: 1, sun: 1, cloud: 1
+    textGroup: 1, heart: 1, star: 1, sun: 1, cloud: 1
   });
 
-  // Touch state for pinch gesture
+  const [dragging, setDragging] = useState(null);
+  const [hitBoxes, setHitBoxes] = useState({});
   const touchState = useRef({ initialDist: null, initialScale: null });
   const draggingRef = useRef(null);
 
   const reverseGeocode = async (latitude, longitude) => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`,
-        { headers: { 'Accept-Language': 'en' } }
-      );
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`, { headers: { 'Accept-Language': 'en' } });
       const json = await res.json();
       const addr = json.address || {};
       const city = addr.city || addr.town || addr.village || addr.county || '';
       const country = addr.country || '';
       return [city, country].filter(Boolean).join(', ');
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Reset input so the same file can be selected again
-    e.target.value = '';
-
-    setLoading(true);
+  const processFile = async (file, index) => {
+    if (cache[index]) return cache[index];
+    
+    let processedData = { image: null, metadata: null };
     try {
-      // Read EXIF from original file BEFORE any conversion
-      const data = await extractMetadata(file);
-      setMetadata(data);
+      const metadata = await extractMetadata(file);
+      processedData.metadata = metadata;
 
-      // Auto-fill photo date from EXIF
-      if (data.dateTaken && !isNaN(new Date(data.dateTaken))) {
-        const dateStr = new Date(data.dateTaken).toISOString().split('T')[0];
-        setOverlays(prev => ({ ...prev, customPhotoDate: dateStr }));
-      }
-
-      // Auto-fill location via reverse geocoding
-      if (data.location?.latitude && data.location?.longitude) {
-        reverseGeocode(data.location.latitude, data.location.longitude).then(name => {
-          if (name) setOverlays(prev => ({ ...prev, customLocation: name }));
-        });
-      }
-
-      // Detect HEIC/HEIF by MIME type or file extension
-      const isHeic =
-        file.type === 'image/heic' ||
-        file.type === 'image/heif' ||
-        /\.(heic|heif)$/i.test(file.name);
-
+      // Detect HEIC
+      const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
       let imageBlob = file;
-
       if (isHeic) {
-        // Convert HEIC → JPEG in browser
-        const converted = await heic2any({
-          blob: file,
-          toType: 'image/jpeg',
-          quality: 0.92,
-        });
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
         imageBlob = Array.isArray(converted) ? converted[0] : converted;
       }
 
       const url = URL.createObjectURL(imageBlob);
-      const img = new Image();
-      img.onload = () => {
-        setImage(img);
-        setLoading(false);
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = () => {
-        console.error('Failed to load image after conversion');
-        setLoading(false);
-      };
-      img.src = url;
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          processedData.image = img;
+          URL.revokeObjectURL(url);
+          setCache(prev => ({ ...prev, [index]: processedData }));
+          resolve(processedData);
+        };
+        img.onerror = () => resolve(processedData);
+        img.src = url;
+      });
     } catch (err) {
-      console.error('Error loading photo:', err);
-      setLoading(false);
+      console.error('Error processing file:', err);
+      return processedData;
     }
   };
 
-  const renderCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !image) return;
+  // Process current file if not cached
+  useEffect(() => {
+    if (files.length === 0) return;
+    const loadCurrent = async () => {
+      if (!cache[currentIndex]) {
+        setLoading(true);
+        await processFile(files[currentIndex], currentIndex);
+        setLoading(false);
+      }
+    };
+    loadCurrent();
+  }, [currentIndex, files, cache]);
 
-    const ctx = canvas.getContext('2d');
-    const maxWidth = 2000;
-    const ratio = Math.min(maxWidth / image.width, 1);
-    canvas.width = image.width * ratio;
-    canvas.height = image.height * ratio;
+  // Handle auto-fill if the FIRST file's metadata drops in and we haven't typed a custom location
+  useEffect(() => {
+    if (currentIndex === 0 && cache[0]?.metadata) {
+      const m = cache[0].metadata;
+      setOverlays(prev => {
+        let updates = { ...prev };
+        if (m.dateTaken && !prev.customPhotoDate) {
+          updates.customPhotoDate = new Date(m.dateTaken).toISOString().split('T')[0];
+        }
+        if (m.location?.latitude && m.location?.longitude && !prev.customLocation && !prev._fetchingLocation) {
+          updates._fetchingLocation = true; // prevent re-fetching loops
+          reverseGeocode(m.location.latitude, m.location.longitude).then(name => {
+            if (name) setOverlays(o => ({ ...o, customLocation: name }));
+          });
+        }
+        return updates;
+      });
+    }
+  }, [cache[0]?.metadata]);
 
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const handleFileChange = (e) => {
+    const selected = Array.from(e.target.files);
+    if (!selected.length) return;
+    e.target.value = ''; // reset input
+    setFiles(selected);
+    setCurrentIndex(0);
+    setCache({});
+  };
 
-    const newHitBoxes = {};
+  const currentData = cache[currentIndex] || {};
+  const { image, metadata } = currentData;
+
+  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta) => {
+    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+    
+    const ratio = Math.min(2000 / img.width, 1);
     const baseFontSize = overlays.fontSize * ratio;
-    ctx.font = `${baseFontSize * 2}px ${overlays.font}`;
+    const newHitBoxes = {};
+
     ctx.fillStyle = overlays.color;
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 10;
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top'; // Easier for auto-stacking down
 
-    // Draw Name
-    if (overlays.showName && (kidProfile.nickname || kidProfile.name)) {
-      const text = kidProfile.nickname || kidProfile.name;
-      const fs = baseFontSize * 2 * (scales.name || 1);
-      ctx.font = `${fs}px ${overlays.font}`;
-      const x = positions.name.x * canvas.width;
-      const y = positions.name.y * canvas.height;
-      ctx.fillText(text, x, y);
-      const metrics = ctx.measureText(text);
-      newHitBoxes.name = { x, y: y - fs / 2, w: metrics.width, h: fs };
+    /* ── 1. Render Auto-Stacking Text Group ── */
+    const lines = [];
+    const photoDate = meta?.dateTaken || (overlays.customPhotoDate ? new Date(overlays.customPhotoDate) : null);
+
+    // NAME Line (e.g. "Nick * 1y7m & Bee * 3y")
+    if (overlays.showName && kidProfiles.length > 0) {
+      const nameText = kidProfiles.map(kid => {
+        const n = kid.nickname || kid.name;
+        if (!n) return null;
+        if (kid.dob && photoDate) {
+          const age = calculateAge(kid.dob, photoDate);
+          let ageStr = '';
+          if (age.years > 0) ageStr += `${age.years}y`;
+          if (age.months > 0) ageStr += `${age.months}m`;
+          if (!ageStr && age.days > 0) ageStr = `${age.days}d`;
+          if (!ageStr) ageStr = '0d';
+          return `${n} • ${ageStr}`;
+        }
+        return n;
+      }).filter(Boolean).join(' & ');
+
+      if (nameText) lines.push(nameText);
     }
 
-    // Draw Date/Age — use EXIF date, fallback to manually entered photo date
-    const photoDate = metadata?.dateTaken || (overlays.customPhotoDate ? new Date(overlays.customPhotoDate) : null);
+    // DATE Line
     if (overlays.showDate && photoDate) {
-      const dateText = formatDate(photoDate);
-      const age = kidProfile.dob ? calculateAge(kidProfile.dob, photoDate) : null;
-      const ageText = age ? ` • ${formatAge(age)}` : '';
-      const combined = `${dateText}${ageText}`;
-      const fs = baseFontSize * 2 * (scales.date || 1);
-      ctx.font = `${fs}px ${overlays.font}`;
-      const x = positions.date.x * canvas.width;
-      const y = positions.date.y * canvas.height;
-      ctx.fillText(combined, x, y);
-      const metrics = ctx.measureText(combined);
-      newHitBoxes.date = { x, y: y - fs / 2, w: metrics.width, h: fs };
+      if (overlays.font === 'VT323') { // Camera timestamp is usually fully uppercase/numeric
+        const d = new Date(photoDate);
+        lines.push(`${d.getFullYear()}'${(d.getMonth()+1).toString().padStart(2,'0')}'${d.getDate().toString().padStart(2,'0')}`);
+      } else {
+        lines.push(formatDate(photoDate));
+      }
     }
 
-    // Draw Location
-    if (overlays.showLocation && (metadata?.location || overlays.customLocation)) {
-      const text = overlays.customLocation || "Somewhere beautiful";
-      const fs = baseFontSize * 2 * (scales.location || 1);
-      ctx.font = `${fs}px ${overlays.font}`;
-      const x = positions.location.x * canvas.width;
-      const y = positions.location.y * canvas.height;
-      ctx.fillText(text, x, y);
-      const metrics = ctx.measureText(text);
-      newHitBoxes.location = { x, y: y - fs / 2, w: metrics.width, h: fs };
+    // LOCATION Line
+    if (overlays.showLocation && (meta?.location || overlays.customLocation)) {
+      lines.push(overlays.customLocation || "Somewhere beautiful");
     }
 
-    // Draw Icons
+    if (lines.length > 0) {
+      const fs = baseFontSize * 2 * (scales.textGroup || 1);
+      ctx.font = `${fs}px ${overlays.font}`;
+      const startX = positions.textGroup.x * canvasWidth;
+      const startY = positions.textGroup.y * canvasHeight;
+      
+      let currentY = startY;
+      let maxWidth = 0;
+      const lineHeight = fs * 1.3;
+
+      lines.forEach(line => {
+        ctx.fillText(line, startX, currentY);
+        const metrics = ctx.measureText(line);
+        maxWidth = Math.max(maxWidth, metrics.width);
+        currentY += lineHeight;
+      });
+
+      newHitBoxes.textGroup = { x: startX, y: startY, w: maxWidth, h: currentY - startY };
+    }
+
+    /* ── 2. Render Icons (freely draggable) ── */
+    ctx.textBaseline = 'middle'; // Reset for icons
     const iconMap = { heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️' };
     overlays.selectedIcons.forEach(iconId => {
       const iconText = iconMap[iconId];
@@ -203,20 +227,33 @@ const PhotoEditor = ({ kidProfile }) => {
       const fs = baseFontSize * 6 * (scales[iconId] || 1);
       ctx.font = `${fs}px serif`;
       const pos = positions[iconId] || { x: 0.5, y: 0.5 };
-      const x = pos.x * canvas.width;
-      const y = pos.y * canvas.height;
+      const x = pos.x * canvasWidth;
+      const y = pos.y * canvasHeight;
       ctx.fillText(iconText, x, y);
       const metrics = ctx.measureText(iconText);
       newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
     });
 
-    setHitBoxes(newHitBoxes);
+    return newHitBoxes;
+  };
+
+  const renderCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+    const ctx = canvas.getContext('2d');
+    const ratio = Math.min(2000 / image.width, 1);
+    canvas.width = image.width * ratio;
+    canvas.height = image.height * ratio;
+
+    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata);
+    setHitBoxes(hitboxes);
   };
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, positions, scales, kidProfile, metadata]);
+  }, [image, overlays, positions, scales, kidProfiles, metadata]);
 
+  /* ── Interaction Logic ── */
   const hitElement = (clientX, clientY) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -228,8 +265,7 @@ const PhotoEditor = ({ kidProfile }) => {
     const keys = Object.keys(hitBoxes).reverse();
     for (const key of keys) {
       const box = hitBoxes[key];
-      if (mouseX >= box.x && mouseX <= box.x + box.w &&
-          mouseY >= box.y && mouseY <= box.y + box.h) {
+      if (mouseX >= box.x && mouseX <= box.x + box.w && mouseY >= box.y && mouseY <= box.y + box.h) {
         return key;
       }
     }
@@ -240,144 +276,125 @@ const PhotoEditor = ({ kidProfile }) => {
     const key = hitElement(e.clientX, e.clientY);
     if (key) { setDragging(key); draggingRef.current = key; }
   };
-
   const handleMouseMove = (e) => {
     if (!dragging || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    setPositions(prev => ({
-      ...prev,
-      [dragging]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
-    }));
+    setPositions(p => ({ ...p, [dragging]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } }));
   };
 
-  /* ── Touch events ── */
-  const getTouchDist = (touches) =>
-    Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
-
+  const getTouchDist = (touches) => Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
   const handleTouchStart = (e) => {
     if (e.touches.length === 1) {
       const t = e.touches[0];
       const key = hitElement(t.clientX, t.clientY);
-      if (key) {
-        setDragging(key);
-        draggingRef.current = key;
-        touchState.current = { initialDist: null, initialScale: null };
-      }
+      if (key) { setDragging(key); draggingRef.current = key; touchState.current = { initialDist: null, initialScale: null }; }
     } else if (e.touches.length === 2 && draggingRef.current) {
-      touchState.current = {
-        initialDist: getTouchDist(e.touches),
-        initialScale: scales[draggingRef.current] || 1
-      };
+      touchState.current = { initialDist: getTouchDist(e.touches), initialScale: scales[draggingRef.current] || 1 };
     }
   };
-
   const handleTouchMove = (e) => {
     const key = draggingRef.current;
     if (!key || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
+    const rect = canvasRef.current.getBoundingClientRect();
     if (e.touches.length === 1 && !touchState.current.initialDist) {
-      // Single-finger drag
-      const t = e.touches[0];
-      const x = (t.clientX - rect.left) / rect.width;
-      const y = (t.clientY - rect.top) / rect.height;
-      setPositions(prev => ({
-        ...prev,
-        [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
-      }));
+      const x = (e.touches[0].clientX - rect.left) / rect.width;
+      const y = (e.touches[0].clientY - rect.top) / rect.height;
+      setPositions(p => ({ ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } }));
     } else if (e.touches.length === 2 && touchState.current.initialDist) {
-      // Two-finger pinch to resize
-      const dist = getTouchDist(e.touches);
-      const pinchScale = dist / touchState.current.initialDist;
-      const newScale = Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale));
-      setScales(prev => ({ ...prev, [key]: newScale }));
+      const pinchScale = getTouchDist(e.touches) / touchState.current.initialDist;
+      setScales(p => ({ ...p, [key]: Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale)) }));
     }
   };
 
-  const handleTouchEnd = () => {
-    setDragging(null);
-    draggingRef.current = null;
-    touchState.current = { initialDist: null, initialScale: null };
-  };
+  const getFileName = (meta, idx) => `KidPhoto_${kidProfiles[0]?.nickname || 'Memory'}_${idx+1}.jpg`;
 
-  const downloadImage = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const downloadImage = async (saveAllFlag = false) => {
+    if (saveAllFlag && files.length > 1) {
+      setSavingAll(true);
+      const generatedFiles = [];
+      const tempCanvas = document.createElement('canvas');
+      const tctx = tempCanvas.getContext('2d');
 
-    const fileName = `KidPhoto_${kidProfile.nickname || kidProfile.name || 'Baby'}_${new Date().getFullYear()}.jpg`;
+      for (let i = 0; i < files.length; i++) {
+        const data = await processFile(files[i], i);
+        if (!data.image) continue;
+        
+        const ratio = Math.min(2000 / data.image.width, 1);
+        tempCanvas.width = data.image.width * ratio;
+        tempCanvas.height = data.image.height * ratio;
+        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata);
+        
+        const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
+        generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
+      }
+      
+      setSavingAll(false);
 
-    canvas.toBlob(async (blob) => {
-      // Try Web Share API — triggers native share sheet on iPhone/Android
-      // User can then tap "Save Image" to save to Photos
-      if (navigator.share && navigator.canShare) {
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
-        if (navigator.canShare({ files: [file] })) {
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
+        try {
+          await navigator.share({ files: generatedFiles, title: 'KidPhoto Memories 📸' });
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+          return;
+        } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+      }
+      
+      // Fallback desktop manual download loop
+      generatedFiles.forEach((file, i) => {
+        setTimeout(() => {
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a'); 
+          a.download = file.name; a.href = url; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, i * 500); // staggering downloads
+      });
+      confetti({ particleCount: 180, spread: 100, origin: { y: 0.6 } });
+
+    } else {
+      // Single download (current)
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], getFileName(metadata, currentIndex), { type: 'image/jpeg' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({
-              files: [file],
-              title: 'KidPhoto Memory 📸',
-            });
+            await navigator.share({ files: [file], title: 'KidPhoto Memory 📸' });
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             return;
-          } catch (err) {
-            if (err.name === 'AbortError') return; // User cancelled
-            // If share failed for another reason, fall through to download
-          }
+          } catch (e) { if (e.name === 'AbortError') return; }
         }
-      }
-
-      // Fallback: trigger file download (desktop)
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = fileName;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-    }, 'image/jpeg', 0.95);
-  };
-
-  const toggleIcon = (iconId) => {
-    setOverlays(prev => {
-      const icons = prev.selectedIcons.includes(iconId)
-        ? prev.selectedIcons.filter(id => id !== iconId)
-        : [...prev.selectedIcons, iconId];
-      return { ...prev, selectedIcons: icons };
-    });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.download = file.name; a.href = url; a.click();
+        URL.revokeObjectURL(url);
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+      }, 'image/jpeg', 0.95);
+    }
   };
 
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
   const fontPickerRef = useRef(null);
-
   useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (fontPickerRef.current && !fontPickerRef.current.contains(e.target)) {
-        setIsFontPickerOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    const c = (e) => { if (fontPickerRef.current && !fontPickerRef.current.contains(e.target)) setIsFontPickerOpen(false); };
+    document.addEventListener('mousedown', c);
+    return () => document.removeEventListener('mousedown', c);
   }, []);
 
   return (
     <div className="editor-container">
-      <div className="editor-main">
-        {loading && (
+      <div className="editor-main" style={{ position: 'relative' }}>
+        {(loading || savingAll) && (
           <div className="loading-overlay">
             <div className="spinner"></div>
-            <p>Magic in progress...</p>
+            <p>{savingAll ? `Saving ${files.length} photos...` : 'Magic in progress...'}</p>
           </div>
         )}
         
-        {!image ? (
+        {files.length === 0 ? (
           <label className="upload-placeholder" htmlFor="file-input">
              <Plus size={64} strokeWidth={2.5} />
-             <p>Drop a memory here</p>
-             <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supports iPhone, Samsung, Android photos</span>
+             <p>Select Photos</p>
+             <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supports multiple iPhone, Samsung, Android photos</span>
           </label>
         ) : (
           <>
@@ -389,23 +406,35 @@ const PhotoEditor = ({ kidProfile }) => {
               onMouseLeave={() => { setDragging(null); draggingRef.current = null; }}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
+              onTouchEnd={() => { setDragging(null); draggingRef.current = null; touchState.current = { initialDist: null, initialScale: null }; }}
               style={{ touchAction: 'none' }}
             />
+
+            {/* Photo Navigator */}
+            {files.length > 1 && (
+              <div className="photo-navigator">
+                <button onClick={() => setCurrentIndex(i => Math.max(0, i - 1))} disabled={currentIndex === 0}>
+                  <ChevronLeft size={24} />
+                </button>
+                <span>{currentIndex + 1} of {files.length}</span>
+                <button onClick={() => setCurrentIndex(i => Math.min(files.length - 1, i + 1))} disabled={currentIndex === files.length - 1}>
+                  <ChevronRight size={24} />
+                </button>
+              </div>
+            )}
+
             <label htmlFor="change-file-input" className="change-photo-btn">
-              <Plus size={16} /> Change Photo
+              <Plus size={16} /> New Photos
             </label>
           </>
         )}
-        <input id="file-input" type="file" accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
-        <input id="change-file-input" type="file" accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
-
+        <input id="file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
+        <input id="change-file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
       </div>
 
       <div className="toolbar">
-        <h3>✨ Customize</h3>
+        <h3>✨ Customize All</h3>
 
-        {/* Show/Hide Overlays */}
         <div className="toolbar-section">
           <div className="control-item">
             <label>Show on Photo</label>
@@ -426,7 +455,6 @@ const PhotoEditor = ({ kidProfile }) => {
           </div>
         </div>
 
-        {/* Font & Color */}
         <div className="toolbar-section">
           <div className="control-item">
             <label><Type size={14} /> Font</label>
@@ -445,10 +473,7 @@ const PhotoEditor = ({ kidProfile }) => {
                       key={f} 
                       className={`font-option ${overlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => {
-                        setOverlays({...overlays, font: f});
-                        setIsFontPickerOpen(false);
-                      }}
+                      onClick={() => { setOverlays({...overlays, font: f}); setIsFontPickerOpen(false); }}
                     >
                       {f}
                     </div>
@@ -482,10 +507,9 @@ const PhotoEditor = ({ kidProfile }) => {
           </div>
         </div>
 
-        {/* Photo Info */}
         <div className="toolbar-section">
           <div className="control-item">
-            <label>📅 Photo Date</label>
+            <label>📅 Global Date Fallback</label>
             <input 
               type="date"
               value={overlays.customPhotoDate}
@@ -493,26 +517,22 @@ const PhotoEditor = ({ kidProfile }) => {
             />
             {metadata?.dateTaken && (
               <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
-                ✓ Auto-read from photo EXIF
+                ✓ Currently rendering from EXIF
               </p>
             )}
           </div>
 
           <div className="control-item">
-            <label><MapPin size={14} /> Location</label>
+            <label><MapPin size={14} /> Global Location</label>
             <input 
               type="text" 
-              placeholder="Where was this?" 
+              placeholder="Applies to all missing locations" 
               value={overlays.customLocation}
               onChange={(e) => setOverlays({...overlays, customLocation: e.target.value})}
             />
-            {metadata?.location && !overlays.customLocation && (
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-light)' }}>Loading location…</p>
-            )}
           </div>
         </div>
 
-        {/* Icons */}
         <div className="toolbar-section">
           <div className="control-item">
             <label><Smile size={14} /> Stickers</label>
@@ -521,7 +541,11 @@ const PhotoEditor = ({ kidProfile }) => {
                 <button 
                   key={icon.id}
                   className={`icon-btn ${overlays.selectedIcons.includes(icon.id) ? 'active' : ''}`}
-                  onClick={() => toggleIcon(icon.id)}
+                  onClick={() => setOverlays(p => ({
+                    ...p, selectedIcons: p.selectedIcons.includes(icon.id) 
+                      ? p.selectedIcons.filter(id => id !== icon.id) 
+                      : [...p.selectedIcons, icon.id]
+                  }))}
                   style={{ color: icon.color }}
                 >
                   <icon.component size={22} fill={overlays.selectedIcons.includes(icon.id) ? icon.color : 'none'} />
@@ -531,20 +555,24 @@ const PhotoEditor = ({ kidProfile }) => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="actions">
-          <button className="secondary-btn" onClick={() => setImage(null)}>
-            <Trash2 size={16} /> Start Over
-          </button>
-          <button className="primary-btn download-btn" onClick={downloadImage} disabled={!image || loading}>
-            <Download size={18} /> Save 🎉
-          </button>
+        <div className="actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+            <button className="secondary-btn" onClick={() => {setFiles([]); setCache({}); }} style={{ flex: 1 }}>
+              <Trash2 size={16} /> Reset
+            </button>
+            <button className="primary-btn download-btn" onClick={() => downloadImage(false)} disabled={files.length === 0 || loading} style={{ flex: 2 }}>
+              <Download size={18} /> Save This
+            </button>
+          </div>
+          {files.length > 1 && (
+            <button className="primary-btn download-btn" onClick={() => downloadImage(true)} disabled={loading || savingAll} style={{ width: '100%', background: 'var(--primary-dark)' }}>
+              <Layers size={18} /> Save All {files.length} Photos
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
-
-
 
 export default PhotoEditor;
