@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
 import { calculateAge, formatAge, formatDate } from '../utils/date-utils';
-import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
 
@@ -34,7 +34,9 @@ const PhotoEditor = ({ kidProfiles }) => {
     fontSize: 40,
     customLocation: '',
     customPhotoDate: '',
-    selectedIcons: []
+    selectedIcons: [],
+    locationDetailMode: 'city_nation',
+    hiddenNames: []
   });
 
   // Normalized positions (0.0 to 1.0)
@@ -52,7 +54,13 @@ const PhotoEditor = ({ kidProfiles }) => {
     textGroup: 1, heart: 1, star: 1, sun: 1, cloud: 1
   });
 
-  const [photoOverrides, setPhotoOverrides] = useState({}); // { [index]: { positions, scales } }
+  const [rotations, setRotations] = useState({
+    textGroup: 0, heart: 0, star: 0, sun: 0, cloud: 0
+  });
+
+  const [photoOverrides, setPhotoOverrides] = useState({}); // { [index]: { positions, scales, rotations, customLocation } }
+  
+  const [history, setHistory] = useState([]);
 
   const [dragging, setDragging] = useState(null);
   const [hitBoxes, setHitBoxes] = useState({});
@@ -61,13 +69,28 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const reverseGeocode = async (latitude, longitude) => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`, { headers: { 'Accept-Language': 'en' } });
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`, { headers: { 'Accept-Language': 'en' } });
       const json = await res.json();
-      const addr = json.address || {};
-      const city = addr.city || addr.town || addr.village || addr.county || '';
-      const country = addr.country || '';
-      return [city, country].filter(Boolean).join(', ');
+      return json.address || {};
     } catch { return null; }
+  };
+
+  const formatLocation = (rawAddr, mode) => {
+    if (!rawAddr) return '';
+    const parts = [];
+    const building = rawAddr.amenity || rawAddr.building || rawAddr.shop || rawAddr.tourism;
+    const district = rawAddr.suburb || rawAddr.neighbourhood || rawAddr.district || rawAddr.borough;
+    const city = rawAddr.city || rawAddr.town || rawAddr.village || rawAddr.county || rawAddr.state;
+    const country = rawAddr.country;
+
+    if (mode === 'full') {
+      [building, district, city, country].forEach(p => p && parts.push(p));
+    } else if (mode === 'district_city') {
+      [district, city, country].forEach(p => p && parts.push(p));
+    } else { 
+      [city, country].forEach(p => p && parts.push(p));
+    }
+    return [...new Set(parts)].join(', ');
   };
 
   const processFile = async (file, index) => {
@@ -92,6 +115,14 @@ const PhotoEditor = ({ kidProfiles }) => {
         img.onload = () => {
           processedData.image = img;
           URL.revokeObjectURL(url);
+          
+          if (metadata && metadata.location?.latitude) {
+            reverseGeocode(metadata.location.latitude, metadata.location.longitude).then(addr => {
+              processedData.metadata.rawAddress = addr;
+              setCache(prev => ({ ...prev, [index]: { ...processedData, metadata: { ...processedData.metadata, rawAddress: addr } } }));
+            });
+          }
+
           setCache(prev => ({ ...prev, [index]: processedData }));
           resolve(processedData);
         };
@@ -117,26 +148,6 @@ const PhotoEditor = ({ kidProfiles }) => {
     loadCurrent();
   }, [currentIndex, files, cache]);
 
-  // Handle auto-fill if the FIRST file's metadata drops in and we haven't typed a custom location
-  useEffect(() => {
-    if (currentIndex === 0 && cache[0]?.metadata) {
-      const m = cache[0].metadata;
-      setOverlays(prev => {
-        let updates = { ...prev };
-        if (m.dateTaken && !prev.customPhotoDate) {
-          updates.customPhotoDate = new Date(m.dateTaken).toISOString().split('T')[0];
-        }
-        if (m.location?.latitude && m.location?.longitude && !prev.customLocation && !prev._fetchingLocation) {
-          updates._fetchingLocation = true; // prevent re-fetching loops
-          reverseGeocode(m.location.latitude, m.location.longitude).then(name => {
-            if (name) setOverlays(o => ({ ...o, customLocation: name }));
-          });
-        }
-        return updates;
-      });
-    }
-  }, [cache[0]?.metadata]);
-
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (!selected.length) return;
@@ -150,8 +161,10 @@ const PhotoEditor = ({ kidProfiles }) => {
   const { image, metadata } = currentData;
   const currentPositions = photoOverrides[currentIndex]?.positions || positions;
   const currentScales = photoOverrides[currentIndex]?.scales || scales;
+  const currentRotations = photoOverrides[currentIndex]?.rotations || rotations;
+  const currentCustomLoc = photoOverrides[currentIndex]?.customLocation;
 
-  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl) => {
+  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, customLoc) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
     
     const ratio = Math.min(2000 / img.width, 1);
@@ -170,20 +183,22 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     // NAME Line (e.g. "Nick * 1y7m & Bee * 3y")
     if (overlays.showName && kidProfiles.length > 0) {
-      const nameText = kidProfiles.map(kid => {
-        const n = kid.nickname || kid.name;
-        if (!n) return null;
-        if (kid.dob && photoDate) {
-          const age = calculateAge(kid.dob, photoDate);
-          let ageStr = '';
-          if (age.years > 0) ageStr += `${age.years}y`;
-          if (age.months > 0) ageStr += `${age.months}m`;
-          if (!ageStr && age.days > 0) ageStr = `${age.days}d`;
-          if (!ageStr) ageStr = '0d';
-          return `${n} • ${ageStr}`;
-        }
-        return n;
-      }).filter(Boolean).join(' & ');
+      const nameText = kidProfiles
+        .filter(kid => !overlays.hiddenNames.includes(kid.id))
+        .map(kid => {
+          const n = kid.nickname || kid.name;
+          if (!n) return null;
+          if (kid.dob && photoDate) {
+            const age = calculateAge(kid.dob, photoDate);
+            let ageStr = '';
+            if (age.years > 0) ageStr += `${age.years}y`;
+            if (age.months > 0) ageStr += `${age.months}m`;
+            if (!ageStr && age.days > 0) ageStr = `${age.days}d`;
+            if (!ageStr) ageStr = '0d';
+            return `${n} • ${ageStr}`;
+          }
+          return n;
+        }).filter(Boolean).join(' & ');
 
       if (nameText) lines.push(`🧸 ${nameText}`);
     }
@@ -199,8 +214,9 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
 
     // LOCATION Line
-    if (overlays.showLocation && (meta?.location || overlays.customLocation)) {
-      lines.push(`📍 ${overlays.customLocation || "Somewhere beautiful"}`);
+    const locText = customLoc !== undefined ? customLoc : formatLocation(meta?.rawAddress, overlays.locationDetailMode);
+    if (overlays.showLocation && locText) {
+      lines.push(`📍 ${locText}`);
     }
 
     if (lines.length > 0) {
@@ -209,18 +225,32 @@ const PhotoEditor = ({ kidProfiles }) => {
       const startX = pos.textGroup.x * canvasWidth;
       const startY = pos.textGroup.y * canvasHeight;
       
-      let currentY = startY;
+      let drawY = startY;
       let maxWidth = 0;
       const lineHeight = fs * 1.3;
 
+      // Calculate width for hitBox first
+      lines.forEach(line => maxWidth = Math.max(maxWidth, ctx.measureText(line).width));
+      const boxHeight = lines.length * lineHeight;
+      newHitBoxes.textGroup = { x: startX, y: startY, w: maxWidth, h: boxHeight };
+
+      if (rot.textGroup !== 0) {
+        ctx.save();
+        const centerX = startX + maxWidth / 2;
+        const centerY = startY + boxHeight / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rot.textGroup * Math.PI / 180);
+        ctx.translate(-centerX, -centerY);
+      }
+
       lines.forEach(line => {
-        ctx.fillText(line, startX, currentY);
-        const metrics = ctx.measureText(line);
-        maxWidth = Math.max(maxWidth, metrics.width);
-        currentY += lineHeight;
+        ctx.fillText(line, startX, drawY);
+        drawY += lineHeight;
       });
 
-      newHitBoxes.textGroup = { x: startX, y: startY, w: maxWidth, h: currentY - startY };
+      if (rot.textGroup !== 0) {
+        ctx.restore();
+      }
     }
 
     /* ── 2. Render Icons (freely draggable) ── */
@@ -234,9 +264,19 @@ const PhotoEditor = ({ kidProfiles }) => {
       const p = pos[iconId] || { x: 0.5, y: 0.5 };
       const x = p.x * canvasWidth;
       const y = p.y * canvasHeight;
-      ctx.fillText(iconText, x, y);
       const metrics = ctx.measureText(iconText);
       newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
+      
+      if (rot[iconId] !== 0) {
+        ctx.save();
+        ctx.translate(x + metrics.width / 2, y);
+        ctx.rotate(rot[iconId] * Math.PI / 180);
+        ctx.translate(-(x + metrics.width / 2), -y);
+      }
+      
+      ctx.fillText(iconText, x, y);
+      
+      if (rot[iconId] !== 0) ctx.restore();
     });
 
     return newHitBoxes;
@@ -250,15 +290,37 @@ const PhotoEditor = ({ kidProfiles }) => {
     canvas.width = image.width * ratio;
     canvas.height = image.height * ratio;
 
-    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales);
+    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales, currentRotations, currentCustomLoc);
     setHitBoxes(hitboxes);
   };
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, currentPositions, currentScales, kidProfiles, metadata]);
+  }, [image, overlays, currentPositions, currentScales, currentRotations, currentCustomLoc, kidProfiles, metadata]);
 
   /* ── Interaction Logic ── */
+  const saveHistory = () => {
+    setHistory(prev => [...prev.slice(-20), { overlays, photoOverrides, positions, scales, rotations }]);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const lastState = history[history.length - 1];
+    setOverlays(lastState.overlays);
+    setPhotoOverrides(lastState.photoOverrides);
+    setPositions(lastState.positions);
+    setScales(lastState.scales);
+    setRotations(lastState.rotations);
+    setHistory(prev => prev.slice(0, -1));
+  };
+
+  const prevDragging = useRef(null);
+  useEffect(() => {
+    if (prevDragging.current && !dragging) {
+      saveHistory();
+    }
+    prevDragging.current = dragging;
+  }, [dragging, overlays, photoOverrides, positions, scales, rotations]);
   const updateOverride = (field, updater) => {
     setPhotoOverrides(prev => {
       const current = prev[currentIndex] || { positions, scales };
@@ -343,7 +405,9 @@ const PhotoEditor = ({ kidProfiles }) => {
         tempCanvas.height = data.image.height * ratio;
         const pos = photoOverrides[i]?.positions || positions;
         const scl = photoOverrides[i]?.scales || scales;
-        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl);
+        const rot = photoOverrides[i]?.rotations || rotations;
+        const loc = photoOverrides[i]?.customLocation;
+        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, loc);
         
         const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
         generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
@@ -452,7 +516,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       </div>
 
       <div className="toolbar">
-        <h3>✨ Customize All</h3>
+        <h3>✨ Customize All <button onClick={handleUndo} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button></h3>
 
         <div className="toolbar-section">
           <div className="control-item">
@@ -460,17 +524,37 @@ const PhotoEditor = ({ kidProfiles }) => {
             <div className="overlay-toggle-row">
               <button 
                 className={`overlay-toggle ${overlays.showName ? 'active' : ''}`}
-                onClick={() => setOverlays({...overlays, showName: !overlays.showName})}
+                onClick={() => { saveHistory(); setOverlays({...overlays, showName: !overlays.showName}); }}
               >👤 Name</button>
               <button 
                 className={`overlay-toggle ${overlays.showDate ? 'active' : ''}`}
-                onClick={() => setOverlays({...overlays, showDate: !overlays.showDate})}
+                onClick={() => { saveHistory(); setOverlays({...overlays, showDate: !overlays.showDate}); }}
               >📅 Date</button>
               <button 
                 className={`overlay-toggle ${overlays.showLocation ? 'active' : ''}`}
-                onClick={() => setOverlays({...overlays, showLocation: !overlays.showLocation})}
+                onClick={() => { saveHistory(); setOverlays({...overlays, showLocation: !overlays.showLocation}); }}
               >📍 Place</button>
             </div>
+            
+            {overlays.showName && kidProfiles.length > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                {kidProfiles.map(kid => (
+                  <label key={kid.id} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!overlays.hiddenNames.includes(kid.id)}
+                      onChange={(e) => {
+                        saveHistory();
+                        const hidden = e.target.checked 
+                          ? overlays.hiddenNames.filter(id => id !== kid.id)
+                          : [...overlays.hiddenNames, kid.id];
+                        setOverlays({...overlays, hiddenNames: hidden});
+                      }}
+                    /> {kid.nickname || kid.name}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -492,7 +576,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                       key={f} 
                       className={`font-option ${overlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => { setOverlays({...overlays, font: f}); setIsFontPickerOpen(false); }}
+                      onClick={() => { saveHistory(); setOverlays({...overlays, font: f}); setIsFontPickerOpen(false); }}
                     >
                       {f}
                     </div>
@@ -508,6 +592,8 @@ const PhotoEditor = ({ kidProfiles }) => {
               type="range" min="20" max="150" 
               value={overlays.fontSize} 
               onChange={(e) => setOverlays({...overlays, fontSize: parseInt(e.target.value)})} 
+              onMouseUp={saveHistory}
+              onTouchEnd={saveHistory}
             />
           </div>
 
@@ -519,20 +605,35 @@ const PhotoEditor = ({ kidProfiles }) => {
                   key={c}
                   className={`color-swatch ${overlays.color === c ? 'active' : ''}`}
                   style={{ backgroundColor: c }}
-                  onClick={() => setOverlays({...overlays, color: c})}
+                  onClick={() => { saveHistory(); setOverlays({...overlays, color: c}); }}
                 />
               ))}
+            </div>
+          </div>
+
+          <div className="control-item">
+            <label>Text Rotation</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <input 
+                style={{ flex: 1 }}
+                type="range" min="-180" max="180" 
+                value={currentRotations.textGroup} 
+                onChange={(e) => updateOverride('rotations', r => ({ ...r, textGroup: parseInt(e.target.value) }))} 
+                onMouseUp={saveHistory}
+                onTouchEnd={saveHistory}
+              />
+              <span style={{ fontSize: '0.8rem', width: '30px', textAlign: 'right' }}>{currentRotations.textGroup}°</span>
             </div>
           </div>
         </div>
 
         <div className="toolbar-section">
           <div className="control-item">
-            <label>📅 Global Date Fallback</label>
+            <label>📅 Date Fallback</label>
             <input 
               type="date"
               value={overlays.customPhotoDate}
-              onChange={(e) => setOverlays({...overlays, customPhotoDate: e.target.value})}
+              onChange={(e) => { saveHistory(); setOverlays({...overlays, customPhotoDate: e.target.value}); }}
             />
             {metadata?.dateTaken && (
               <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
@@ -542,13 +643,27 @@ const PhotoEditor = ({ kidProfiles }) => {
           </div>
 
           <div className="control-item">
-            <label><MapPin size={14} /> Global Location</label>
+            <label><MapPin size={14} /> Custom Location (This Photo)</label>
             <input 
               type="text" 
-              placeholder="Applies to all missing locations" 
-              value={overlays.customLocation}
-              onChange={(e) => setOverlays({...overlays, customLocation: e.target.value})}
+              placeholder="Ex: Hanoi, Vietnam" 
+              value={currentCustomLoc ?? ''}
+              onChange={(e) => updateOverride('customLocation', () => e.target.value)}
+              onBlur={saveHistory}
             />
+          </div>
+
+          <div className="control-item">
+            <label>Location Auto-Format</label>
+            <select 
+              value={overlays.locationDetailMode} 
+              onChange={e => { saveHistory(); setOverlays({...overlays, locationDetailMode: e.target.value}); }}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '0.8rem', border: '1px solid var(--glass-border)', fontFamily: 'Outfit, sans-serif' }}
+            >
+              <option value="city_nation">City, Nation</option>
+              <option value="district_city">District, City</option>
+              <option value="full">Building, District, City, Nation</option>
+            </select>
           </div>
         </div>
 
@@ -560,11 +675,14 @@ const PhotoEditor = ({ kidProfiles }) => {
                 <button 
                   key={icon.id}
                   className={`icon-btn ${overlays.selectedIcons.includes(icon.id) ? 'active' : ''}`}
-                  onClick={() => setOverlays(p => ({
-                    ...p, selectedIcons: p.selectedIcons.includes(icon.id) 
-                      ? p.selectedIcons.filter(id => id !== icon.id) 
-                      : [...p.selectedIcons, icon.id]
-                  }))}
+                  onClick={() => {
+                    saveHistory();
+                    setOverlays(p => ({
+                      ...p, selectedIcons: p.selectedIcons.includes(icon.id) 
+                        ? p.selectedIcons.filter(id => id !== icon.id) 
+                        : [...p.selectedIcons, icon.id]
+                    }));
+                  }}
                   style={{ color: icon.color }}
                 >
                   <icon.component size={22} fill={overlays.selectedIcons.includes(icon.id) ? icon.color : 'none'} />
