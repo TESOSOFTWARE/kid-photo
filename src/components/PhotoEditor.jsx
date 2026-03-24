@@ -236,14 +236,41 @@ const PhotoEditor = ({ kidProfile }) => {
 
   const stopDragging = () => setDragging(null);
 
-  const downloadImage = () => {
+  const downloadImage = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = `KidPhoto_${kidProfile.nickname || 'Photo'}.png`;
-    link.href = canvas.toDataURL('image/png', 1.0);
-    link.click();
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+
+    const fileName = `KidPhoto_${kidProfile.nickname || kidProfile.name || 'Baby'}_${new Date().getFullYear()}.jpg`;
+
+    canvas.toBlob(async (blob) => {
+      // Try Web Share API — triggers native share sheet on iPhone/Android
+      // User can then tap "Save Image" to save to Photos
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'KidPhoto Memory 📸',
+            });
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            return;
+          } catch (err) {
+            if (err.name === 'AbortError') return; // User cancelled
+            // If share failed for another reason, fall through to download
+          }
+        }
+      }
+
+      // Fallback: trigger file download (desktop)
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    }, 'image/jpeg', 0.95);
   };
 
   const toggleIcon = (iconId) => {
