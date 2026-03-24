@@ -552,22 +552,26 @@ const PhotoEditor = ({ kidProfiles }) => {
             </div>
             
             {overlays.showName && kidProfiles.length > 0 && (
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                {kidProfiles.map((kid, index) => (
-                  <label key={index} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={!overlays.hiddenNames.includes(index)}
-                      onChange={(e) => {
+              <div className="overlay-toggle-row" style={{ marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                {kidProfiles.map((kid, index) => {
+                  const isVisible = !overlays.hiddenNames.includes(index);
+                  return (
+                    <button 
+                      key={index}
+                      className={`overlay-toggle ${isVisible ? 'active' : ''}`}
+                      style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                      onClick={() => {
                         saveHistory();
-                        const hidden = e.target.checked 
+                        const hidden = !isVisible 
                           ? overlays.hiddenNames.filter(idx => idx !== index)
                           : [...overlays.hiddenNames, index];
                         setOverlays({...overlays, hiddenNames: hidden});
                       }}
-                    /> Nickname {index + 1}
-                  </label>
-                ))}
+                    >
+                      {kid.nickname || kid.name || `Kid ${index + 1}`}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
