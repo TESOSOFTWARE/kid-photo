@@ -26,7 +26,11 @@ const KidProfile = ({ onProfileChange }) => {
   };
 
   const handleChange = (index, field, value) => {
-    const updated = children.map((c, i) => i === index ? { ...c, [field]: value } : c);
+    let finalValue = value;
+    if (field === 'name') {
+      finalValue = value.replace(/(^\w|\s\w)/g, m => m.toUpperCase());
+    }
+    const updated = children.map((c, i) => i === index ? { ...c, [field]: finalValue } : c);
     save(updated);
   };
 

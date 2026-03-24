@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
 import { calculateAge, formatAge, formatDate } from '../utils/date-utils';
-import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw } from 'lucide-react';
+import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
 
@@ -9,7 +9,15 @@ const CUTE_ICONS = [
   { id: 'heart', component: Heart, color: '#ff6b6b' },
   { id: 'star', component: Star, color: '#fcc419' },
   { id: 'sun', component: Sun, color: '#ffd43b' },
-  { id: 'cloud', component: Cloud, color: '#339af0' }
+  { id: 'cloud', component: Cloud, color: '#339af0' },
+  { id: 'moon', component: Moon, color: '#748ffc' },
+  { id: 'music', component: Music, color: '#f06595' },
+  { id: 'sparkles', component: Sparkles, color: '#fcc419' },
+  { id: 'camera', component: Camera, color: '#868e96' },
+  { id: 'umbrella', component: Umbrella, color: '#be4bdb' },
+  { id: 'plane', component: Plane, color: '#1098ad' },
+  { id: 'zap', component: Zap, color: '#fab005' },
+  { id: 'smile', component: Smile, color: '#fd7e14' }
 ];
 
 const FONTS = ['Outfit', 'Inter', 'Pacifico', 'Comfortaa', 'Fredoka', 'Sniglet', 'Itim', 'VT323', 'cursive', 'serif'];
@@ -255,13 +263,20 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     /* ── 2. Render Icons (freely draggable) ── */
     ctx.textBaseline = 'middle'; // Reset for icons
-    const iconMap = { heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️' };
-    overlays.selectedIcons.forEach(iconId => {
-      const iconText = iconMap[iconId];
+    const iconMap = { 
+      heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️',
+      moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸',
+      umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊'
+    };
+    overlays.selectedIcons.forEach(iconObj => {
+      const iconId = iconObj.id || iconObj;
+      const iconType = iconObj.type || iconObj;
+      const iconText = iconMap[iconType];
       if (!iconText) return;
       const fs = baseFontSize * 6 * (scl[iconId] || 1);
       ctx.font = `${fs}px serif`;
-      const p = pos[iconId] || { x: 0.5, y: 0.5 };
+      // Stagger new instances a bit using the length of selectedIcons, or fallback to center
+      const p = pos[iconId] || { x: 0.5 + (Math.random()*0.1 - 0.05), y: 0.5 + (Math.random()*0.1 - 0.05) };
       const x = p.x * canvasWidth;
       const y = p.y * canvasHeight;
       const metrics = ctx.measureText(iconText);
@@ -550,7 +565,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                           : [...overlays.hiddenNames, index];
                         setOverlays({...overlays, hiddenNames: hidden});
                       }}
-                    /> {kid.nickname || kid.name}
+                    /> Nickname {index + 1}
                   </label>
                 ))}
               </div>
@@ -674,21 +689,28 @@ const PhotoEditor = ({ kidProfiles }) => {
               {CUTE_ICONS.map(icon => (
                 <button 
                   key={icon.id}
-                  className={`icon-btn ${overlays.selectedIcons.includes(icon.id) ? 'active' : ''}`}
+                  className="icon-btn"
                   onClick={() => {
                     saveHistory();
                     setOverlays(p => ({
-                      ...p, selectedIcons: p.selectedIcons.includes(icon.id) 
-                        ? p.selectedIcons.filter(id => id !== icon.id) 
-                        : [...p.selectedIcons, icon.id]
+                      ...p, selectedIcons: [...p.selectedIcons, { id: `${icon.id}-${Date.now()}-${Math.random()}`, type: icon.id }]
                     }));
                   }}
                   style={{ color: icon.color }}
                 >
-                  <icon.component size={22} fill={overlays.selectedIcons.includes(icon.id) ? icon.color : 'none'} />
+                  <icon.component size={22} />
                 </button>
               ))}
             </div>
+            {overlays.selectedIcons.length > 0 && (
+              <button 
+                className="secondary-btn" 
+                onClick={() => { saveHistory(); setOverlays(p => ({ ...p, selectedIcons: [] })); }}
+                style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.85rem' }}
+              >
+                <Trash2 size={14}/> Clear All Stickers
+              </button>
+            )}
           </div>
         </div>
 
