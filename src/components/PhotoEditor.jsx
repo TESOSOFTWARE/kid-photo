@@ -46,6 +46,16 @@ const PhotoEditor = ({ kidProfile }) => {
   const [dragging, setDragging] = useState(null);
   const [hitBoxes, setHitBoxes] = useState({});
 
+  // Per-element scale multiplier (pinch to resize)
+  const [scales, setScales] = useState({
+    name: 1, date: 1, location: 1,
+    heart: 1, star: 1, sun: 1, cloud: 1
+  });
+
+  // Touch state for pinch gesture
+  const touchState = useRef({ initialDist: null, initialScale: null });
+  const draggingRef = useRef(null);
+
   const reverseGeocode = async (latitude, longitude) => {
     try {
       const res = await fetch(
@@ -148,11 +158,13 @@ const PhotoEditor = ({ kidProfile }) => {
     // Draw Name
     if (overlays.showName && (kidProfile.nickname || kidProfile.name)) {
       const text = kidProfile.nickname || kidProfile.name;
+      const fs = baseFontSize * 2 * (scales.name || 1);
+      ctx.font = `${fs}px ${overlays.font}`;
       const x = positions.name.x * canvas.width;
       const y = positions.name.y * canvas.height;
       ctx.fillText(text, x, y);
       const metrics = ctx.measureText(text);
-      newHitBoxes.name = { x, y: y - baseFontSize, w: metrics.width, h: baseFontSize * 2 };
+      newHitBoxes.name = { x, y: y - fs / 2, w: metrics.width, h: fs };
     }
 
     // Draw Date/Age — use EXIF date, fallback to manually entered photo date
@@ -162,21 +174,25 @@ const PhotoEditor = ({ kidProfile }) => {
       const age = kidProfile.dob ? calculateAge(kidProfile.dob, photoDate) : null;
       const ageText = age ? ` • ${formatAge(age)}` : '';
       const combined = `${dateText}${ageText}`;
+      const fs = baseFontSize * 2 * (scales.date || 1);
+      ctx.font = `${fs}px ${overlays.font}`;
       const x = positions.date.x * canvas.width;
       const y = positions.date.y * canvas.height;
       ctx.fillText(combined, x, y);
       const metrics = ctx.measureText(combined);
-      newHitBoxes.date = { x, y: y - baseFontSize, w: metrics.width, h: baseFontSize * 2 };
+      newHitBoxes.date = { x, y: y - fs / 2, w: metrics.width, h: fs };
     }
 
     // Draw Location
     if (overlays.showLocation && (metadata?.location || overlays.customLocation)) {
       const text = overlays.customLocation || "Somewhere beautiful";
+      const fs = baseFontSize * 2 * (scales.location || 1);
+      ctx.font = `${fs}px ${overlays.font}`;
       const x = positions.location.x * canvas.width;
       const y = positions.location.y * canvas.height;
       ctx.fillText(text, x, y);
       const metrics = ctx.measureText(text);
-      newHitBoxes.location = { x, y: y - baseFontSize, w: metrics.width, h: baseFontSize * 2 };
+      newHitBoxes.location = { x, y: y - fs / 2, w: metrics.width, h: fs };
     }
 
     // Draw Icons
@@ -184,13 +200,14 @@ const PhotoEditor = ({ kidProfile }) => {
     overlays.selectedIcons.forEach(iconId => {
       const iconText = iconMap[iconId];
       if (!iconText) return;
-      ctx.font = `${baseFontSize * 6}px serif`;
+      const fs = baseFontSize * 6 * (scales[iconId] || 1);
+      ctx.font = `${fs}px serif`;
       const pos = positions[iconId] || { x: 0.5, y: 0.5 };
       const x = pos.x * canvas.width;
       const y = pos.y * canvas.height;
       ctx.fillText(iconText, x, y);
       const metrics = ctx.measureText(iconText);
-      newHitBoxes[iconId] = { x, y: y - baseFontSize * 3, w: metrics.width, h: baseFontSize * 6 };
+      newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
     });
 
     setHitBoxes(newHitBoxes);
@@ -198,27 +215,30 @@ const PhotoEditor = ({ kidProfile }) => {
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, positions, kidProfile]);
+  }, [image, overlays, positions, scales, kidProfile, metadata]);
 
-  const handleMouseDown = (e) => {
+  const hitElement = (clientX, clientY) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
-
-    // Check hitboxes in reverse order so the last drawn (topmost) is picked first
+    const mouseX = (clientX - rect.left) * scaleX;
+    const mouseY = (clientY - rect.top) * scaleY;
     const keys = Object.keys(hitBoxes).reverse();
     for (const key of keys) {
       const box = hitBoxes[key];
       if (mouseX >= box.x && mouseX <= box.x + box.w &&
           mouseY >= box.y && mouseY <= box.y + box.h) {
-        setDragging(key);
-        return;
+        return key;
       }
     }
+    return null;
+  };
+
+  const handleMouseDown = (e) => {
+    const key = hitElement(e.clientX, e.clientY);
+    if (key) { setDragging(key); draggingRef.current = key; }
   };
 
   const handleMouseMove = (e) => {
@@ -227,14 +247,62 @@ const PhotoEditor = ({ kidProfile }) => {
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    
     setPositions(prev => ({
       ...prev,
       [dragging]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
     }));
   };
 
-  const stopDragging = () => setDragging(null);
+  /* ── Touch events ── */
+  const getTouchDist = (touches) =>
+    Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const key = hitElement(t.clientX, t.clientY);
+      if (key) {
+        setDragging(key);
+        draggingRef.current = key;
+        touchState.current = { initialDist: null, initialScale: null };
+      }
+    } else if (e.touches.length === 2 && draggingRef.current) {
+      touchState.current = {
+        initialDist: getTouchDist(e.touches),
+        initialScale: scales[draggingRef.current] || 1
+      };
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    const key = draggingRef.current;
+    if (!key || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    if (e.touches.length === 1 && !touchState.current.initialDist) {
+      // Single-finger drag
+      const t = e.touches[0];
+      const x = (t.clientX - rect.left) / rect.width;
+      const y = (t.clientY - rect.top) / rect.height;
+      setPositions(prev => ({
+        ...prev,
+        [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+      }));
+    } else if (e.touches.length === 2 && touchState.current.initialDist) {
+      // Two-finger pinch to resize
+      const dist = getTouchDist(e.touches);
+      const pinchScale = dist / touchState.current.initialDist;
+      const newScale = Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale));
+      setScales(prev => ({ ...prev, [key]: newScale }));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setDragging(null);
+    draggingRef.current = null;
+    touchState.current = { initialDist: null, initialScale: null };
+  };
 
   const downloadImage = async () => {
     const canvas = canvasRef.current;
@@ -317,8 +385,12 @@ const PhotoEditor = ({ kidProfile }) => {
               ref={canvasRef} 
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
-              onMouseUp={stopDragging}
-              onMouseLeave={stopDragging}
+              onMouseUp={() => { setDragging(null); draggingRef.current = null; }}
+              onMouseLeave={() => { setDragging(null); draggingRef.current = null; }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              style={{ touchAction: 'none' }}
             />
             <label htmlFor="change-file-input" className="change-photo-btn">
               <Plus size={16} /> Change Photo
