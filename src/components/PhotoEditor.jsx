@@ -40,7 +40,8 @@ const PhotoEditor = ({ kidProfiles }) => {
   // Normalized positions (0.0 to 1.0)
   // Text relies on a single textGroup for auto-stacking!
   const [positions, setPositions] = useState({
-    textGroup: { x: 0.05, y: 0.85 },
+    textGroup: { x: 0.05, y: 0.05 },
+
     heart: { x: 0.80, y: 0.15 },
     star: { x: 0.85, y: 0.15 },
     sun: { x: 0.90, y: 0.15 },
@@ -50,6 +51,8 @@ const PhotoEditor = ({ kidProfiles }) => {
   const [scales, setScales] = useState({
     textGroup: 1, heart: 1, star: 1, sun: 1, cloud: 1
   });
+
+  const [photoOverrides, setPhotoOverrides] = useState({}); // { [index]: { positions, scales } }
 
   const [dragging, setDragging] = useState(null);
   const [hitBoxes, setHitBoxes] = useState({});
@@ -145,8 +148,10 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const currentData = cache[currentIndex] || {};
   const { image, metadata } = currentData;
+  const currentPositions = photoOverrides[currentIndex]?.positions || positions;
+  const currentScales = photoOverrides[currentIndex]?.scales || scales;
 
-  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta) => {
+  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
     
     const ratio = Math.min(2000 / img.width, 1);
@@ -195,14 +200,14 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     // LOCATION Line
     if (overlays.showLocation && (meta?.location || overlays.customLocation)) {
-      lines.push(overlays.customLocation || "Somewhere beautiful");
+      lines.push(`📍 ${overlays.customLocation || "Somewhere beautiful"}`);
     }
 
     if (lines.length > 0) {
-      const fs = baseFontSize * 2 * (scales.textGroup || 1);
+      const fs = baseFontSize * 2 * (scl.textGroup || 1);
       ctx.font = `${fs}px ${overlays.font}`;
-      const startX = positions.textGroup.x * canvasWidth;
-      const startY = positions.textGroup.y * canvasHeight;
+      const startX = pos.textGroup.x * canvasWidth;
+      const startY = pos.textGroup.y * canvasHeight;
       
       let currentY = startY;
       let maxWidth = 0;
@@ -224,11 +229,11 @@ const PhotoEditor = ({ kidProfiles }) => {
     overlays.selectedIcons.forEach(iconId => {
       const iconText = iconMap[iconId];
       if (!iconText) return;
-      const fs = baseFontSize * 6 * (scales[iconId] || 1);
+      const fs = baseFontSize * 6 * (scl[iconId] || 1);
       ctx.font = `${fs}px serif`;
-      const pos = positions[iconId] || { x: 0.5, y: 0.5 };
-      const x = pos.x * canvasWidth;
-      const y = pos.y * canvasHeight;
+      const p = pos[iconId] || { x: 0.5, y: 0.5 };
+      const x = p.x * canvasWidth;
+      const y = p.y * canvasHeight;
       ctx.fillText(iconText, x, y);
       const metrics = ctx.measureText(iconText);
       newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
@@ -245,15 +250,21 @@ const PhotoEditor = ({ kidProfiles }) => {
     canvas.width = image.width * ratio;
     canvas.height = image.height * ratio;
 
-    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata);
+    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales);
     setHitBoxes(hitboxes);
   };
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, positions, scales, kidProfiles, metadata]);
+  }, [image, overlays, currentPositions, currentScales, kidProfiles, metadata]);
 
   /* ── Interaction Logic ── */
+  const updateOverride = (field, updater) => {
+    setPhotoOverrides(prev => {
+      const current = prev[currentIndex] || { positions, scales };
+      return { ...prev, [currentIndex]: { ...current, [field]: updater(current[field]) } };
+    });
+  };
   const hitElement = (clientX, clientY) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -281,7 +292,9 @@ const PhotoEditor = ({ kidProfiles }) => {
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    setPositions(p => ({ ...p, [dragging]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } }));
+    updateOverride('positions', p => ({
+      ...p, [dragging]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+    }));
   };
 
   const getTouchDist = (touches) => Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
@@ -291,7 +304,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       const key = hitElement(t.clientX, t.clientY);
       if (key) { setDragging(key); draggingRef.current = key; touchState.current = { initialDist: null, initialScale: null }; }
     } else if (e.touches.length === 2 && draggingRef.current) {
-      touchState.current = { initialDist: getTouchDist(e.touches), initialScale: scales[draggingRef.current] || 1 };
+      touchState.current = { initialDist: getTouchDist(e.touches), initialScale: currentScales[draggingRef.current] || 1 };
     }
   };
   const handleTouchMove = (e) => {
@@ -301,10 +314,14 @@ const PhotoEditor = ({ kidProfiles }) => {
     if (e.touches.length === 1 && !touchState.current.initialDist) {
       const x = (e.touches[0].clientX - rect.left) / rect.width;
       const y = (e.touches[0].clientY - rect.top) / rect.height;
-      setPositions(p => ({ ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } }));
+      updateOverride('positions', p => ({
+        ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+      }));
     } else if (e.touches.length === 2 && touchState.current.initialDist) {
       const pinchScale = getTouchDist(e.touches) / touchState.current.initialDist;
-      setScales(p => ({ ...p, [key]: Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale)) }));
+      updateOverride('scales', s => ({
+        ...s, [key]: Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale))
+      }));
     }
   };
 
@@ -324,7 +341,9 @@ const PhotoEditor = ({ kidProfiles }) => {
         const ratio = Math.min(2000 / data.image.width, 1);
         tempCanvas.width = data.image.width * ratio;
         tempCanvas.height = data.image.height * ratio;
-        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata);
+        const pos = photoOverrides[i]?.positions || positions;
+        const scl = photoOverrides[i]?.scales || scales;
+        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl);
         
         const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
         generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
