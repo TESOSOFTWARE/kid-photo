@@ -185,16 +185,16 @@ const PhotoEditor = ({ kidProfiles }) => {
         return n;
       }).filter(Boolean).join(' & ');
 
-      if (nameText) lines.push(nameText);
+      if (nameText) lines.push(`🧸 ${nameText}`);
     }
 
     // DATE Line
     if (overlays.showDate && photoDate) {
       if (overlays.font === 'VT323') { // Camera timestamp is usually fully uppercase/numeric
         const d = new Date(photoDate);
-        lines.push(`${d.getFullYear()}'${(d.getMonth()+1).toString().padStart(2,'0')}'${d.getDate().toString().padStart(2,'0')}`);
+        lines.push(`🗓️ ${d.getFullYear()}'${(d.getMonth()+1).toString().padStart(2,'0')}'${d.getDate().toString().padStart(2,'0')}`);
       } else {
-        lines.push(formatDate(photoDate));
+        lines.push(`📅 ${formatDate(photoDate)}`);
       }
     }
 
