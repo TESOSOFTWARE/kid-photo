@@ -135,13 +135,13 @@ const TagManager = ({ onProfileChange }) => {
     <div className={`event-form-body${isNew ? ' event-form-new child-card' : ''}`}>
       {isNew && (
         <div className="child-card-header">
-          <span className="child-label">✨ New Event</span>
+          <span className="child-label">✨ New Tag</span>
           <button className="remove-child-btn" onClick={closeForm}><X size={14} /></button>
         </div>
       )}
 
       <div className="input-group">
-        <label>Event Name</label>
+        <label>Tag Name</label>
         <input
           type="text"
           value={formData.name}
@@ -224,13 +224,23 @@ const TagManager = ({ onProfileChange }) => {
         <h3>Tags & Events</h3>
         {openId !== 'new' && (
           <button className="add-event-btn-mini" onClick={openNewForm}>
-            <Plus size={16} /> Add Event
+            <Plus size={16} /> Add Tag
           </button>
         )}
       </div>
 
       {/* New event form */}
       {openId === 'new' && renderForm(true)}
+
+      {/* Empty state hint */}
+      {events.length === 0 && openId !== 'new' && (
+        <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--card-bg)', borderRadius: '1rem', border: '1px dashed var(--glass-border)', marginTop: '0.5rem' }}>
+          <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>No tags created yet! Add a tag to start tracking an event.</p>
+          <button className="primary-btn" onClick={openNewForm} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', width: 'auto', display: 'inline-flex' }}>
+            <Plus size={14} /> Add your first Tag
+          </button>
+        </div>
+      )}
 
       {/* Event list */}
       <div className="event-list">

@@ -390,17 +390,30 @@ const PhotoEditor = ({ kidProfiles }) => {
   // Keys belonging to each section
   const SECTIONS = {
     visibility: ['showName', 'showDate', 'showLocation', 'hiddenNames'],
-    typography: ['font', 'color', 'fontSize'],
+    typography: ['font', 'color', 'fontSize'], // Since Font, Color, Size all fall under this, they share the toggle state
+    rotation: ['rotations'], // We'll map rotation override detection here
     date: ['customPhotoDate'],
     location: ['locationDetailMode'],
     stickers: ['selectedIcons'],
   };
   const isDefaultSection = (section) => {
+    if (section === 'rotation') {
+      const rot = photoOverrides[currentIndex]?.rotations;
+      return !rot || Object.keys(rot).length === 0;
+    }
     const keys = SECTIONS[section] || [];
     const style = photoOverrides[currentIndex]?.style || {};
     return !keys.some(k => k in style);
   };
   const resetToDefault = (section) => {
+    if (section === 'rotation') {
+      setPhotoOverrides(prev => {
+        const curr = { ...(prev[currentIndex] || {}) };
+        delete curr.rotations;
+        return { ...prev, [currentIndex]: curr };
+      });
+      return;
+    }
     const keys = SECTIONS[section] || [];
     setPhotoOverrides(prev => {
       const curr = { ...(prev[currentIndex] || {}) };
@@ -411,6 +424,22 @@ const PhotoEditor = ({ kidProfiles }) => {
   };
 
   const applyToAll = (section) => {
+    if (section === 'rotation') {
+      const currentRot = photoOverrides[currentIndex]?.rotations || {};
+      // Update global rotation state
+      setRotations(prev => ({ ...prev, ...currentRot }));
+      
+      // Erase per-photo rotation overrides
+      setPhotoOverrides(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(idx => {
+          if (next[idx].rotations) delete next[idx].rotations;
+        });
+        return next;
+      });
+      return;
+    }
+
     const keys = SECTIONS[section] || [];
     const currentStyle = photoOverrides[currentIndex]?.style || {};
     
@@ -793,19 +822,19 @@ const PhotoEditor = ({ kidProfiles }) => {
           </div>
 
           <div className="control-item">
-            <label>Size</label>
+            <label>Text Size</label>
+            <DefaultToggle section="typography" />
             <input 
-              type="range" min="20" max="150" 
+              type="range" min="10" max="100" 
               value={currentFontSize} 
-              onChange={(e) => updateOverride('fontSize', () => parseInt(e.target.value))} 
-              onMouseUp={saveHistory}
-              onTouchEnd={saveHistory}
+              onChange={(e) => updateStyle('fontSize', parseInt(e.target.value))} 
             />
           </div>
 
           <div className="control-item">
-            <label>Color</label>
-            <div className="color-swatch-grid">
+            <label>Font Color</label>
+            <DefaultToggle section="typography" />
+            <div className="color-swatches" style={{ marginTop: '0.4rem' }}>
               {COLORS.map(c => (
                 <div 
                   key={c}
@@ -819,6 +848,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Text Rotation</label>
+            <DefaultToggle section="rotation" />
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <input 
                 style={{ flex: 1 }}
