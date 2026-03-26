@@ -233,6 +233,168 @@ input:focus {
   box-shadow: 0 0 0 4px var(--primary-light);
 }
 
+/* Event / Tag Styles */
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.add-event-btn-mini {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border: 1.5px solid var(--primary);
+  border-radius: 2rem;
+  transition: all 0.2s;
+}
+
+.add-event-btn-mini:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.event-form {
+  border-left: 4px solid var(--primary);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.type-toggle {
+  display: flex;
+  gap: 0.5rem;
+  background: #f1f3f5;
+  padding: 0.3rem;
+  border-radius: 0.8rem;
+}
+
+.type-toggle button {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text-light);
+}
+
+.type-toggle button.active {
+  background: white;
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.recurrence-select {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 0.6rem;
+  border: 1.5px solid rgba(0,0,0,0.08);
+  font-family: inherit;
+}
+
+.save-event-btn {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.event-item-card {
+  background: white;
+  border-radius: 1rem;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.event-item-card.expanded {
+  border-color: var(--primary);
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.15);
+}
+
+.event-item-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  transition: background 0.15s;
+}
+
+.event-item-card.expanded .event-item-compact {
+  background: var(--primary-light);
+  border-bottom: 1px solid rgba(255,107,107,0.15);
+}
+
+.event-inline-form {
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: slideDown 0.2s ease-out;
+}
+
+.event-form-new {
+  animation: slideDown 0.25s ease-out;
+}
+
+.event-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.active-action {
+  background: var(--primary-light) !important;
+  color: var(--primary-dark) !important;
+}
+
+.event-preview-line {
+  display: flex;
+  flex-direction: column;
+}
+
+.event-name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.event-result {
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.event-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.event-actions button {
+  padding: 0.4rem;
+  border-radius: 0.5rem;
+  background: #f8f9fa;
+  color: var(--text-light);
+}
+
+.event-actions button:hover {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
 /* Photo Editor */
 .editor-container { 
   display: flex; 
@@ -261,29 +423,136 @@ canvas {
 
 .change-photo-btn {
   position: absolute;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.5rem 1rem;
   background: rgba(255,255,255,0.9);
   backdrop-filter: blur(8px);
-  border: 1.5px solid var(--glass-border);
-  border-radius: 1rem;
-  padding: 0.6rem 1.2rem;
-  font-size: 0.9rem;
+  border-radius: 2rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  font-family: 'Outfit', sans-serif;
-  color: var(--text);
+  color: var(--primary-dark);
+  border: 1.5px solid var(--primary-light);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   box-shadow: var(--shadow-md);
   transition: all 0.2s;
+  z-index: 30;
 }
 
 .change-photo-btn:hover {
   background: white;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.thumbnail-slider-container {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 160px); /* leave room for New Photos button on right */
+  max-width: 480px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(10px);
+  padding: 0.4rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.thumbnail-slider {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.2rem;
+  scrollbar-width: none;
+}
+
+.thumbnail-slider::-webkit-scrollbar { display: none; }
+
+.thumbnail-item {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 0.6rem;
+  overflow: visible; /* allow remove btn to peek out */
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.thumbnail-item > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  display: block;
+}
+
+.thumbnail-item.active {
+  border-color: var(--primary);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(255,107,107,0.3);
+}
+
+
+.thumb-remove-btn {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  color: white;
+  font-size: 0.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  z-index: 20;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+.thumb-remove-btn:hover {
+  background: #cc0000;
+  transform: scale(1.15);
+}
+
+.thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+.photo-info-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(0,0,0,0.5);
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  z-index: 20;
 }
 
 .photo-navigator {
@@ -737,7 +1006,6 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
     overflow: hidden;
   }
 
-  /* Toolbar: full-width below canvas */
   .toolbar {
     width: 100%;
     min-width: unset;

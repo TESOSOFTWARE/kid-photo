@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
-import { calculateAge, formatAge, formatDate } from '../utils/date-utils';
+import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDate } from '../utils/date-utils';
 import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
@@ -27,7 +27,9 @@ const PhotoEditor = ({ kidProfiles }) => {
   const canvasRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [cache, setCache] = useState({}); // { [index]: { image, metadata, processing } }
+  const LOAD_LIMIT = 30;
+  const [cache, setCache] = useState({}); // { [index]: { image, metadata } }
+  const [thumbUrls, setThumbUrls] = useState({}); // { [index]: dataURL } persistent per-photo thumbnail
   
   const [loading, setLoading] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
@@ -66,7 +68,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     textGroup: 0, heart: 0, star: 0, sun: 0, cloud: 0
   });
 
-  const [photoOverrides, setPhotoOverrides] = useState({}); // { [index]: { positions, scales, rotations, customLocation } }
+  const [photoOverrides, setPhotoOverrides] = useState({}); // { [idx]: { positions, scales, rotations, fontSize, customLocation, style: {} } }
   
   const [history, setHistory] = useState([]);
 
@@ -123,7 +125,14 @@ const PhotoEditor = ({ kidProfiles }) => {
         img.onload = () => {
           processedData.image = img;
           URL.revokeObjectURL(url);
-          
+
+          // Generate a small thumbnail data URL so it persists after URL revoke
+          const thumbCanvas = document.createElement('canvas');
+          const tw = 120, th = Math.round(120 * img.height / img.width);
+          thumbCanvas.width = tw; thumbCanvas.height = th;
+          thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+          setThumbUrls(prev => ({ ...prev, [index]: thumbCanvas.toDataURL('image/jpeg', 0.6) }));
+
           if (metadata && metadata.location?.latitude) {
             reverseGeocode(metadata.location.latitude, metadata.location.longitude).then(addr => {
               processedData.metadata.rawAddress = addr;
@@ -157,12 +166,36 @@ const PhotoEditor = ({ kidProfiles }) => {
   }, [currentIndex, files, cache]);
 
   const handleFileChange = (e) => {
-    const selected = Array.from(e.target.files);
+    let selected = Array.from(e.target.files);
     if (!selected.length) return;
+    if (files.length + selected.length > LOAD_LIMIT) {
+      alert(`Limited to ${LOAD_LIMIT} photos for stability. The rest were skipped.`);
+      selected = selected.slice(0, LOAD_LIMIT - files.length);
+    }
     const oldLength = files.length;
     setFiles(prev => [...prev, ...selected]);
-    setCurrentIndex(oldLength); // Jump to first new file
-    e.target.value = ''; // reset input
+    setCurrentIndex(oldLength);
+    e.target.value = '';
+  };
+
+  const removePhoto = (idx) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+    setCache(prev => {
+      const next = {};
+      Object.keys(prev).forEach(k => { const n = parseInt(k); if (n < idx) next[n] = prev[n]; else if (n > idx) next[n - 1] = prev[n]; });
+      return next;
+    });
+    setThumbUrls(prev => {
+      const next = {};
+      Object.keys(prev).forEach(k => { const n = parseInt(k); if (n < idx) next[n] = prev[n]; else if (n > idx) next[n - 1] = prev[n]; });
+      return next;
+    });
+    setPhotoOverrides(prev => {
+      const next = {};
+      Object.keys(prev).forEach(k => { const n = parseInt(k); if (n < idx) next[n] = prev[n]; else if (n > idx) next[n - 1] = prev[n]; });
+      return next;
+    });
+    setCurrentIndex(prev => Math.max(0, idx <= prev ? prev - 1 : prev));
   };
 
   const currentData = cache[currentIndex] || {};
@@ -172,34 +205,50 @@ const PhotoEditor = ({ kidProfiles }) => {
   const currentRotations = photoOverrides[currentIndex]?.rotations || rotations;
   const currentFontSize = photoOverrides[currentIndex]?.fontSize || overlays.fontSize;
   const currentCustomLoc = photoOverrides[currentIndex]?.customLocation;
+  // Merge global defaults with per-photo style overrides
+  const currentOverlays = { ...overlays, ...(photoOverrides[currentIndex]?.style || {}) };
 
-  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, fsz, customLoc) => {
+  const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, fsz, customLoc, ov) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
     
     const ratio = Math.min(2000 / img.width, 1);
     const baseFontSize = fsz * ratio;
-    const stickerBaseSize = 40 * ratio; // Fixed base for stickers
+    const stickerBaseSize = 40 * ratio;
     const newHitBoxes = {};
 
-    ctx.fillStyle = overlays.color;
+    ctx.fillStyle = ov.color;
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 10;
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'top'; // Easier for auto-stacking down
+    ctx.textBaseline = 'top';
 
     /* ── 1. Render Auto-Stacking Text Group ── */
     const lines = [];
-    const photoDate = meta?.dateTaken || (overlays.customPhotoDate ? new Date(overlays.customPhotoDate) : null);
+    const photoDate = meta?.dateTaken || (ov.customPhotoDate ? new Date(ov.customPhotoDate) : null);
 
-    // NAME Line (e.g. "Nick * 1y7m & Bee * 3y")
-    if (overlays.showName && kidProfiles.length > 0) {
+    // NAME / EVENT Line
+    if (ov.showName && kidProfiles.length > 0) {
       const nameText = kidProfiles
-        .filter((kid, index) => !overlays.hiddenNames.includes(index))
-        .map((kid, index) => {
-          const n = kid.nickname || kid.name;
+        .filter((evt, index) => !ov.hiddenNames.includes(index))
+        .map((evt) => {
+          const n = evt.name;
           if (!n) return null;
-          if (kid.dob && photoDate) {
-            const age = calculateAge(kid.dob, photoDate);
+
+          // New TinyTag event format
+          if (evt.type === 'countdown' || evt.type === 'countup') {
+            let targetDate = new Date(evt.date);
+            const now = photoDate ? new Date(photoDate) : new Date();
+            if (evt.type === 'countdown' && evt.isRecurring) {
+              targetDate = getNextRecurringDate(evt.date, evt.frequency);
+            }
+            const diff = calculateDiff(targetDate, now, evt.format || 'y-m-d');
+            const suffix = evt.label ? ` ${evt.label}` : '';
+            return `${n} · ${diff}${suffix}`;
+          }
+
+          // Legacy countup via dob
+          if (evt.dob && photoDate) {
+            const age = calculateAge(evt.dob, photoDate);
             let ageStr = '';
             if (age.years > 0) ageStr += `${age.years}y`;
             if (age.months > 0) ageStr += `${age.months}m`;
@@ -210,12 +259,12 @@ const PhotoEditor = ({ kidProfiles }) => {
           return n;
         }).filter(Boolean).join(' & ');
 
-      if (nameText) lines.push(`🧸 ${nameText}`);
+      if (nameText) lines.push(`🏷️ ${nameText}`);
     }
 
     // DATE Line
-    if (overlays.showDate && photoDate) {
-      if (overlays.font === 'VT323') { // Camera timestamp is usually fully uppercase/numeric
+    if (ov.showDate && photoDate) {
+      if (ov.font === 'VT323') {
         const d = new Date(photoDate);
         lines.push(`🗓️ ${d.getFullYear()}'${(d.getMonth()+1).toString().padStart(2,'0')}'${d.getDate().toString().padStart(2,'0')}`);
       } else {
@@ -224,14 +273,14 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
 
     // LOCATION Line
-    const locText = customLoc !== undefined ? customLoc : formatLocation(meta?.rawAddress, overlays.locationDetailMode);
-    if (overlays.showLocation && locText) {
+    const locText = customLoc !== undefined ? customLoc : formatLocation(meta?.rawAddress, ov.locationDetailMode);
+    if (ov.showLocation && locText) {
       lines.push(`📍 ${locText}`);
     }
 
     if (lines.length > 0) {
       const fs = baseFontSize * 2 * (scl.textGroup || 1);
-      ctx.font = `${fs}px ${overlays.font}`;
+      ctx.font = `${fs}px ${ov.font}`;
       const startX = pos.textGroup.x * canvasWidth;
       const startY = pos.textGroup.y * canvasHeight;
       
@@ -264,13 +313,13 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
 
     /* ── 2. Render Icons (freely draggable) ── */
-    ctx.textBaseline = 'middle'; // Reset for icons
+    ctx.textBaseline = 'middle';
     const iconMap = { 
       heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️',
       moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸',
       umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊'
     };
-    overlays.selectedIcons.forEach(iconObj => {
+    ov.selectedIcons.forEach(iconObj => {
       const iconId = iconObj.id || iconObj;
       const iconType = iconObj.type || iconObj;
       const iconText = iconMap[iconType];
@@ -278,13 +327,13 @@ const PhotoEditor = ({ kidProfiles }) => {
       const fs = stickerBaseSize * 6 * (scl[iconId] || 1);
       ctx.font = `${fs}px serif`;
       // Stagger new instances a bit using the length of selectedIcons, or fallback to center
-      const p = pos[iconId] || { x: 0.5 + (Math.random()*0.1 - 0.05), y: 0.5 + (Math.random()*0.1 - 0.05) };
+      const p = pos[iconId] || { x: 0.5, y: 0.5 };
       const x = p.x * canvasWidth;
       const y = p.y * canvasHeight;
       const metrics = ctx.measureText(iconText);
       newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
       
-      if (rot[iconId] !== 0) {
+      if (rot[iconId] !== undefined && rot[iconId] !== 0) {
         ctx.save();
         ctx.translate(x + metrics.width / 2, y);
         ctx.rotate(rot[iconId] * Math.PI / 180);
@@ -293,7 +342,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       
       ctx.fillText(iconText, x, y);
       
-      if (rot[iconId] !== 0) ctx.restore();
+      if (rot[iconId] !== undefined && rot[iconId] !== 0) ctx.restore();
     });
 
     return newHitBoxes;
@@ -306,14 +355,13 @@ const PhotoEditor = ({ kidProfiles }) => {
     const ratio = Math.min(2000 / image.width, 1);
     canvas.width = image.width * ratio;
     canvas.height = image.height * ratio;
-
-    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales, currentRotations, currentFontSize, currentCustomLoc);
+    const hitboxes = renderToCanvas(ctx, canvas.width, canvas.height, image, metadata, currentPositions, currentScales, currentRotations, currentFontSize, currentCustomLoc, currentOverlays);
     setHitBoxes(hitboxes);
   };
 
   useEffect(() => {
     if (image) renderCanvas();
-  }, [image, overlays, currentPositions, currentScales, currentRotations, currentFontSize, currentCustomLoc, kidProfiles, metadata]);
+  }, [image, overlays, photoOverrides, currentIndex, kidProfiles, metadata]);
 
   /* ── Interaction Logic ── */
   const saveHistory = () => {
@@ -338,10 +386,94 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
     prevDragging.current = dragging;
   }, [dragging, overlays, photoOverrides, positions, scales, rotations]);
+  // Section-based Default logic
+  // Keys belonging to each section
+  const SECTIONS = {
+    visibility: ['showName', 'showDate', 'showLocation', 'hiddenNames'],
+    typography: ['font', 'color', 'fontSize'],
+    date: ['customPhotoDate'],
+    location: ['locationDetailMode'],
+    stickers: ['selectedIcons'],
+  };
+  const isDefaultSection = (section) => {
+    const keys = SECTIONS[section] || [];
+    const style = photoOverrides[currentIndex]?.style || {};
+    return !keys.some(k => k in style);
+  };
+  const resetToDefault = (section) => {
+    const keys = SECTIONS[section] || [];
+    setPhotoOverrides(prev => {
+      const curr = { ...(prev[currentIndex] || {}) };
+      const style = { ...(curr.style || {}) };
+      keys.forEach(k => delete style[k]);
+      return { ...prev, [currentIndex]: { ...curr, style } };
+    });
+  };
+
+  const applyToAll = (section) => {
+    const keys = SECTIONS[section] || [];
+    const currentStyle = photoOverrides[currentIndex]?.style || {};
+    
+    // First, map the current styles to the global default overlays
+    const updates = {};
+    keys.forEach(k => {
+      updates[k] = k in currentStyle ? currentStyle[k] : overlays[k];
+    });
+
+    setOverlays(prev => ({ ...prev, ...updates }));
+
+    // Then, remove these keys from ALL photo overrides so they inherit the new global default
+    setPhotoOverrides(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(idx => {
+        if (next[idx].style) {
+          const newStyle = { ...next[idx].style };
+          keys.forEach(k => delete newStyle[k]);
+          next[idx] = { ...next[idx], style: newStyle };
+        }
+      });
+      return next;
+    });
+  };
+
+  const DefaultToggle = ({ section }) => (
+    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+      <button
+        className="secondary-btn"
+        onClick={() => resetToDefault(section)}
+        disabled={isDefaultSection(section)}
+        style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', opacity: isDefaultSection(section) ? 0.5 : 1 }}
+      >
+        {isDefaultSection(section) ? '✓ Using default' : '↺ Reset to default'}
+      </button>
+      <button
+        className="secondary-btn"
+        onClick={() => {
+          if (window.confirm("This will apply the current photo's settings for this section to ALL photos. Continue?")) {
+            applyToAll(section);
+          }
+        }}
+        style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
+      >
+        ✨ Apply to all
+      </button>
+    </div>
+  );
+
+  // Save a style field for the CURRENT photo only (merges on top of global defaults)
+  const updateStyle = (field, value) => {
+    saveHistory();
+    setPhotoOverrides(prev => {
+      const curr = prev[currentIndex] || {};
+      return { ...prev, [currentIndex]: { ...curr, style: { ...(curr.style || {}), [field]: value } } };
+    });
+  };
+
   const updateOverride = (field, updater) => {
     setPhotoOverrides(prev => {
-      const current = prev[currentIndex] || { positions, scales, rotations, fontSize: overlays.fontSize };
-      const newVal = typeof updater === 'function' ? updater(current[field]) : updater;
+      const current = prev[currentIndex] || {};
+      const currentFieldValue = current[field] || (field === 'positions' ? positions : field === 'scales' ? scales : field === 'rotations' ? rotations : field === 'fontSize' ? overlays.fontSize : undefined);
+      const newVal = typeof updater === 'function' ? updater(currentFieldValue) : updater;
       return { ...prev, [currentIndex]: { ...current, [field]: newVal } };
     });
   };
@@ -382,7 +514,8 @@ const PhotoEditor = ({ kidProfiles }) => {
     if (e.touches.length === 1) {
       const t = e.touches[0];
       const key = hitElement(t.clientX, t.clientY);
-      if (key) { setDragging(key); draggingRef.current = key; touchState.current = { initialDist: null, initialScale: null }; }
+      touchState.current.startX = t.clientX;
+      if (key) { setDragging(key); draggingRef.current = key; touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; }
     } else if (e.touches.length === 2 && draggingRef.current) {
       touchState.current = { initialDist: getTouchDist(e.touches), initialScale: currentScales[draggingRef.current] || 1 };
     }
@@ -394,9 +527,26 @@ const PhotoEditor = ({ kidProfiles }) => {
     if (e.touches.length === 1 && !touchState.current.initialDist) {
       const x = (e.touches[0].clientX - rect.left) / rect.width;
       const y = (e.touches[0].clientY - rect.top) / rect.height;
-      updateOverride('positions', p => ({
-        ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
-      }));
+      
+      // Swipe detection
+      const touch = e.touches[0];
+      const moveX = touch.clientX - touchState.current.startX;
+      if (Math.abs(moveX) > 100 && !draggingRef.current) {
+         if (moveX > 0 && currentIndex > 0) {
+           setCurrentIndex(prev => prev - 1);
+           touchState.current.startX = touch.clientX; // Reset to avoid multiple triggers
+         } else if (moveX < 0 && currentIndex < files.length - 1) {
+           setCurrentIndex(prev => prev + 1);
+           touchState.current.startX = touch.clientX;
+         }
+         return;
+      }
+
+      if (draggingRef.current) {
+        updateOverride('positions', p => ({
+          ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+        }));
+      }
     } else if (e.touches.length === 2 && touchState.current.initialDist) {
       const pinchScale = getTouchDist(e.touches) / touchState.current.initialDist;
       updateOverride('scales', s => ({
@@ -405,7 +555,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
   };
 
-  const getFileName = (meta, idx) => `KidPhoto_${kidProfiles[0]?.nickname || 'Memory'}_${idx+1}.jpg`;
+  const getFileName = (meta, idx) => `TinyTag_${kidProfiles[0]?.name || 'Memory'}_${idx+1}.jpg`;
 
   const downloadImage = async (saveAllFlag = false) => {
     if (saveAllFlag && files.length > 1) {
@@ -421,12 +571,13 @@ const PhotoEditor = ({ kidProfiles }) => {
         const ratio = Math.min(2000 / data.image.width, 1);
         tempCanvas.width = data.image.width * ratio;
         tempCanvas.height = data.image.height * ratio;
-        const pos = photoOverrides[i]?.positions || positions;
+      const pos = photoOverrides[i]?.positions || positions;
         const scl = photoOverrides[i]?.scales || scales;
         const rot = photoOverrides[i]?.rotations || rotations;
         const fsz = photoOverrides[i]?.fontSize || overlays.fontSize;
         const loc = photoOverrides[i]?.customLocation;
-        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, fsz, loc);
+        const ov = { ...overlays, ...(photoOverrides[i]?.style || {}) };
+        renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, fsz, loc, ov);
         
         const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
         generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
@@ -436,7 +587,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
         try {
-          await navigator.share({ files: generatedFiles, title: 'KidPhoto Memories 📸' });
+          await navigator.share({ files: generatedFiles, title: 'TinyTag Memories 📸' });
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
           return;
         } catch (e) { if (e.name !== 'AbortError') console.error(e); }
@@ -461,7 +612,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         const file = new File([blob], getFileName(metadata, currentIndex), { type: 'image/jpeg' });
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({ files: [file], title: 'KidPhoto Memory 📸' });
+            await navigator.share({ files: [file], title: 'TinyTag Memory 📸' });
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             return;
           } catch (e) { if (e.name === 'AbortError') return; }
@@ -512,16 +663,32 @@ const PhotoEditor = ({ kidProfiles }) => {
               style={{ touchAction: 'none' }}
             />
 
-            {/* Photo Navigator */}
-            {files.length > 1 && (
-              <div className="photo-navigator">
-                <button onClick={() => setCurrentIndex(i => Math.max(0, i - 1))} disabled={currentIndex === 0}>
-                  <ChevronLeft size={24} />
-                </button>
-                <span>{currentIndex + 1} of {files.length}</span>
-                <button onClick={() => setCurrentIndex(i => Math.min(files.length - 1, i + 1))} disabled={currentIndex === files.length - 1}>
-                  <ChevronRight size={24} />
-                </button>
+            {/* Thumbnail Slider */}
+            {files.length >= 1 && (
+              <div className="thumbnail-slider-container">
+                <div className="thumbnail-slider">
+                  {files.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className={`thumbnail-item ${currentIndex === idx ? 'active' : ''}`}
+                      onClick={() => setCurrentIndex(idx)}
+                    >
+                      {thumbUrls[idx] ? (
+                        <img src={thumbUrls[idx]} alt={`thumb-${idx}`} />
+                      ) : (
+                        <div className="thumbnail-placeholder">{idx + 1}</div>
+                      )}
+                      {/* Remove button on active thumbnail */}
+                      {currentIndex === idx && (
+                        <button
+                          className="thumb-remove-btn"
+                          onClick={e => { e.stopPropagation(); removePhoto(idx); }}
+                          title="Remove this photo"
+                        >✕</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -532,44 +699,58 @@ const PhotoEditor = ({ kidProfiles }) => {
         )}
         <input id="file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
         <input id="change-file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
+        
+        {files.length > 0 && (
+          <div className="photo-info-badge">
+            {currentIndex + 1} / {files.length}
+          </div>
+        )}
       </div>
 
       <div className="toolbar">
-        <h3>✨ Customize All <button onClick={handleUndo} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button></h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+          <div>
+            <h3>📸 Photo Settings</h3>
+            {photoOverrides[currentIndex]?.style && (
+              <span style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', fontWeight: 600 }}>✦ Custom overrides active</span>
+            )}
+          </div>
+          <button onClick={handleUndo} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button>
+        </div>
 
         <div className="toolbar-section">
           <div className="control-item">
             <label>Show on Photo</label>
+            <DefaultToggle section="visibility" />
             <div className="overlay-toggle-row">
               <button 
-                className={`overlay-toggle ${overlays.showName ? 'active' : ''}`}
-                onClick={() => { saveHistory(); setOverlays({...overlays, showName: !overlays.showName}); }}
-              >👤 Name</button>
+                className={`overlay-toggle ${currentOverlays.showName ? 'active' : ''}`}
+                onClick={() => updateStyle('showName', !currentOverlays.showName)}
+              >🏷️ Tags</button>
               <button 
-                className={`overlay-toggle ${overlays.showDate ? 'active' : ''}`}
-                onClick={() => { saveHistory(); setOverlays({...overlays, showDate: !overlays.showDate}); }}
+                className={`overlay-toggle ${currentOverlays.showDate ? 'active' : ''}`}
+                onClick={() => updateStyle('showDate', !currentOverlays.showDate)}
               >📅 Date</button>
               <button 
-                className={`overlay-toggle ${overlays.showLocation ? 'active' : ''}`}
-                onClick={() => { saveHistory(); setOverlays({...overlays, showLocation: !overlays.showLocation}); }}
+                className={`overlay-toggle ${currentOverlays.showLocation ? 'active' : ''}`}
+                onClick={() => updateStyle('showLocation', !currentOverlays.showLocation)}
               >📍 Place</button>
             </div>
             
-            {overlays.showName && kidProfiles.length > 0 && (
+            {currentOverlays.showName && kidProfiles.length > 0 && (
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
-                {kidProfiles.map((kid, index) => {
-                  const name = kid.nickname || kid.name || `Child ${index + 1}`;
-                  const isActive = !overlays.hiddenNames.includes(index);
+                {kidProfiles.map((evt, index) => {
+                  const name = evt.name || `Event ${index + 1}`;
+                  const isActive = !currentOverlays.hiddenNames.includes(index);
                   return (
                     <button 
                       key={index}
                       className={`overlay-toggle ${isActive ? 'active' : ''}`}
                       onClick={() => {
-                        saveHistory();
                         const hidden = isActive 
-                          ? [...overlays.hiddenNames, index]
-                          : overlays.hiddenNames.filter(idx => idx !== index);
-                        setOverlays({...overlays, hiddenNames: hidden});
+                          ? [...currentOverlays.hiddenNames, index]
+                          : currentOverlays.hiddenNames.filter(idx => idx !== index);
+                        updateStyle('hiddenNames', hidden);
                       }}
                       style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
                     >
@@ -585,22 +766,23 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label><Type size={14} /> Font</label>
+            <DefaultToggle section="typography" />
             <div className="custom-select-container" ref={fontPickerRef}>
               <button 
                 className="font-select-trigger" 
                 onClick={() => setIsFontPickerOpen(!isFontPickerOpen)}
-                style={{ fontFamily: overlays.font }}
+                style={{ fontFamily: currentOverlays.font }}
               >
-                {overlays.font} <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>▾</span>
+                {currentOverlays.font} <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>▾</span>
               </button>
               {isFontPickerOpen && (
                 <div className="font-options-dropdown">
                   {FONTS.map(f => (
                     <div 
                       key={f} 
-                      className={`font-option ${overlays.font === f ? 'active' : ''}`}
+                      className={`font-option ${currentOverlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => { saveHistory(); setOverlays({...overlays, font: f}); setIsFontPickerOpen(false); }}
+                      onClick={() => { updateStyle('font', f); setIsFontPickerOpen(false); }}
                     >
                       {f}
                     </div>
@@ -627,9 +809,9 @@ const PhotoEditor = ({ kidProfiles }) => {
               {COLORS.map(c => (
                 <div 
                   key={c}
-                  className={`color-swatch ${overlays.color === c ? 'active' : ''}`}
+                  className={`color-swatch ${currentOverlays.color === c ? 'active' : ''}`}
                   style={{ backgroundColor: c }}
-                  onClick={() => { saveHistory(); setOverlays({...overlays, color: c}); }}
+                  onClick={() => updateStyle('color', c)}
                 />
               ))}
             </div>
@@ -637,16 +819,16 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Text Rotation</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <input 
                 style={{ flex: 1 }}
                 type="range" min="-180" max="180" 
-                value={currentRotations.textGroup} 
+                value={currentRotations.textGroup ?? 0} 
                 onChange={(e) => updateOverride('rotations', r => ({ ...r, textGroup: parseInt(e.target.value) }))} 
                 onMouseUp={saveHistory}
                 onTouchEnd={saveHistory}
               />
-              <span style={{ fontSize: '0.8rem', width: '30px', textAlign: 'right' }}>{currentRotations.textGroup}°</span>
+              <span style={{ fontSize: '0.8rem', width: '30px', textAlign: 'right' }}>{currentRotations.textGroup ?? 0}°</span>
             </div>
           </div>
         </div>
@@ -654,10 +836,11 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label>📅 Date Fallback</label>
+            <DefaultToggle section="date" />
             <input 
               type="date"
-              value={overlays.customPhotoDate}
-              onChange={(e) => { saveHistory(); setOverlays({...overlays, customPhotoDate: e.target.value}); }}
+              value={currentOverlays.customPhotoDate || ''}
+              onChange={(e) => updateStyle('customPhotoDate', e.target.value)}
             />
             {metadata?.dateTaken && (
               <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
@@ -679,9 +862,10 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Location Auto-Format</label>
+            <DefaultToggle section="location" />
             <select 
-              value={overlays.locationDetailMode} 
-              onChange={e => { saveHistory(); setOverlays({...overlays, locationDetailMode: e.target.value}); }}
+              value={currentOverlays.locationDetailMode}
+              onChange={e => updateStyle('locationDetailMode', e.target.value)}
               style={{ width: '100%', padding: '0.6rem', borderRadius: '0.8rem', border: '1px solid var(--glass-border)', fontFamily: 'Outfit, sans-serif' }}
             >
               <option value="city_nation">City, Nation</option>
@@ -694,16 +878,17 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label><Smile size={14} /> Stickers</label>
+            <DefaultToggle section="stickers" />
             <div className="icon-grid">
               {CUTE_ICONS.map(icon => (
                 <button 
-                  key={icon.id}
+                  key={icon.id} 
                   className="icon-btn"
                   onClick={() => {
-                    saveHistory();
-                    setOverlays(p => ({
-                      ...p, selectedIcons: [...p.selectedIcons, { id: `${icon.id}-${Date.now()}-${Math.random()}`, type: icon.id }]
-                    }));
+                    const newId = `${icon.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    // Seed initial position to exactly center so it's not random on render
+                    updateOverride('positions', p => ({ ...p, [newId]: { x: 0.5, y: 0.5 } }));
+                    updateStyle('selectedIcons', [...(currentOverlays.selectedIcons || []), { id: newId, type: icon.id }]);
                   }}
                   style={{ color: icon.color }}
                 >
@@ -712,18 +897,18 @@ const PhotoEditor = ({ kidProfiles }) => {
               ))}
             </div>
 
-            {overlays.selectedIcons.length > 0 && (
+            {(currentOverlays.selectedIcons || []).length > 0 && (
               <div style={{ marginTop: '1rem' }}>
                 <label style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '0.4rem', display: 'block' }}>Tap to remove:</label>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {overlays.selectedIcons.map((s) => {
+                  {(currentOverlays.selectedIcons || []).map((s) => {
                     const iconMap = { heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️', moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸', umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊' };
                     return (
                       <button 
                         key={s.id} 
                         onClick={() => {
                           saveHistory();
-                          setOverlays(p => ({ ...p, selectedIcons: p.selectedIcons.filter(x => x.id !== s.id) }));
+                          updateStyle('selectedIcons', currentOverlays.selectedIcons.filter(x => x.id !== s.id));
                         }} 
                         className="overlay-toggle active" 
                         style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -735,7 +920,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </div>
                 <button 
                   className="secondary-btn" 
-                  onClick={() => { saveHistory(); setOverlays(p => ({ ...p, selectedIcons: [] })); }}
+                  onClick={() => { saveHistory(); updateStyle('selectedIcons', []); }}
                   style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.82rem', padding: '0.4rem' }}
                 >
                   <Trash2 size={12}/> Clear All

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Heart, User, Sliders, Image } from 'lucide-react'
-import KidProfile from './components/KidProfile'
+import TagManager from './components/TagManager'
 import PhotoEditor from './components/PhotoEditor'
 
 function App() {
@@ -15,11 +15,11 @@ function App() {
         <header className="app-header">
           <Heart className="logo-icon" size={36} fill="var(--primary)" color="var(--primary)" />
           <div>
-            <h1>KidPhoto</h1>
+            <h1>TinyTag</h1>
             <p className="subtitle">Capture every milestone</p>
           </div>
         </header>
-        <KidProfile onProfileChange={setKidProfiles} />
+        <TagManager onProfileChange={setKidProfiles} />
         <div className="sidebar-footer">
           <p>Made for parents by parents ✨</p>
         </div>
@@ -29,7 +29,7 @@ function App() {
       <div className="mobile-top-bar">
         <div className="mobile-logo">
           <Heart size={22} fill="var(--primary)" color="var(--primary)" />
-          <span>KidPhoto</span>
+          <span>TinyTag</span>
         </div>
         <div className="mobile-tabs">
           <button
@@ -42,14 +42,14 @@ function App() {
             className={`mobile-tab ${mobileTab === 'profile' ? 'active' : ''}`}
             onClick={() => setMobileTab('profile')}
           >
-            <User size={16} /> Profile
+            <User size={16} /> Tag
           </button>
         </div>
       </div>
 
       {/* Mobile profile tab */}
       <div className={`mobile-profile-view ${mobileTab === 'profile' ? 'visible' : ''}`}>
-        <KidProfile onProfileChange={setKidProfiles} />
+        <TagManager onProfileChange={setKidProfiles} />
       </div>
 
       {/* Main content - always mounted, conditionally visible on mobile */}

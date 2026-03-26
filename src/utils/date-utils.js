@@ -36,9 +36,64 @@ export const formatAge = (age) => {
 
 export const formatDate = (date) => {
   if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
   return new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
-  }).format(date);
+  }).format(d);
+};
+
+export const calculateDiff = (targetDate, referenceDate = new Date(), format = 'y-m-d') => {
+  const start = referenceDate < targetDate ? referenceDate : targetDate;
+  const end = referenceDate < targetDate ? targetDate : referenceDate;
+  
+  const diff = calculateAge(start, end);
+  if (!diff) return '';
+
+  const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+  const totalMonths = diff.years * 12 + diff.months;
+
+  switch (format) {
+    case 'd': return `${totalDays}d`;
+    case 'm-d': {
+      let parts = [];
+      if (totalMonths > 0) parts.push(`${totalMonths}m`);
+      if (diff.days > 0) parts.push(`${diff.days}d`);
+      return parts.length ? parts.join(' ') : '0d';
+    }
+    case 'y-m-d': {
+      let parts = [];
+      if (diff.years > 0) parts.push(`${diff.years}y`);
+      if (diff.months > 0) parts.push(`${diff.months}m`);
+      if (diff.days > 0) parts.push(`${diff.days}d`);
+      return parts.length ? parts.join(' ') : '0d';
+    }
+    case 'y': return `${diff.years}y`;
+    case 'y-m': {
+       let parts = [];
+       if (diff.years > 0) parts.push(`${diff.years}y`);
+       if (diff.months > 0) parts.push(`${diff.months}m`);
+       return parts.length ? parts.join(' ') : '0m';
+    }
+    default: return `${totalDays}d`;
+  }
+};
+
+export const getNextRecurringDate = (dateStr, frequency = 'yearly') => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  let next = new Date(now.getFullYear(), date.getMonth(), date.getDate());
+
+  if (frequency === 'yearly') {
+    if (next < now) {
+      next.setFullYear(now.getFullYear() + 1);
+    }
+  } else if (frequency === 'monthly') {
+    next = new Date(now.getFullYear(), now.getMonth(), date.getDate());
+    if (next < now) {
+      next.setMonth(now.getMonth() + 1);
+    }
+  }
+  return next;
 };
