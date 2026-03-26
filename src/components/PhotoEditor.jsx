@@ -48,6 +48,10 @@ const PhotoEditor = ({ kidProfiles }) => {
     locationDetailMode: 'city_nation',
     hiddenNames: []
   });
+  
+  const [watermarkRemoved, setWatermarkRemoved] = useState(() => localStorage.getItem('tiny-watermark-removed') === 'true');
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(0);
 
   // Normalized positions (0.0 to 1.0)
   // Text relies on a single textGroup for auto-stacking!
@@ -168,6 +172,11 @@ const PhotoEditor = ({ kidProfiles }) => {
   const handleFileChange = (e) => {
     let selected = Array.from(e.target.files);
     if (!selected.length) return;
+
+    // Reset watermark if adding new photos to force monetization for each batch
+    setWatermarkRemoved(false);
+    localStorage.setItem('tiny-watermark-removed', 'false');
+
     if (files.length + selected.length > LOAD_LIMIT) {
       alert(`Limited to ${LOAD_LIMIT} photos for stability. The rest were skipped.`);
       selected = selected.slice(0, LOAD_LIMIT - files.length);
@@ -290,8 +299,8 @@ const PhotoEditor = ({ kidProfiles }) => {
       }
     }
 
-    // LOCATION Line
-    const locText = customLoc !== undefined ? customLoc : formatLocation(meta?.rawAddress, ov.locationDetailMode);
+    // LOCATION Line - Use custom location override if provided, otherwise use extracted EXIF data
+    const locText = (customLoc && customLoc.trim()) ? customLoc : formatLocation(meta?.rawAddress, ov.locationDetailMode);
     if (ov.showLocation && locText) {
       lines.push(`📍 ${locText}`);
     }
@@ -362,6 +371,27 @@ const PhotoEditor = ({ kidProfiles }) => {
       
       if (rot[iconId] !== undefined && rot[iconId] !== 0) ctx.restore();
     });
+
+    /* ── 3. Render Watermark ── */
+    if (!watermarkRemoved) {
+      const watermarkText = "✨ Made with TinyTag";
+      ctx.save();
+      const wmSize = Math.max(20, 32 * (canvasWidth / 1000));
+      ctx.font = `700 ${wmSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      
+      // Draw subtle shadow for readability on any background
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+
+      // Draw high-contrast semi-transparent white text
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillText(watermarkText, canvasWidth - (25 * (canvasWidth / 1000)), canvasHeight - (25 * (canvasWidth / 1000)));
+      ctx.restore();
+    }
 
     return newHitBoxes;
   };
@@ -674,11 +704,37 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
   const fontPickerRef = useRef(null);
+  
+  // Handlers for font picker and ad countdown
   useEffect(() => {
     const c = (e) => { if (fontPickerRef.current && !fontPickerRef.current.contains(e.target)) setIsFontPickerOpen(false); };
     document.addEventListener('mousedown', c);
     return () => document.removeEventListener('mousedown', c);
   }, []);
+
+  useEffect(() => {
+    let timer;
+    if (isWatchingAd && adCountdown > 0) {
+      if (adCountdown === 10) {
+        // Small delay to ensure the <ins> tag is fully mounted in the DOM
+        setTimeout(() => {
+          try {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (e) {
+            console.error("AdSense error:", e);
+          }
+        }, 100);
+      }
+      timer = setInterval(() => {
+        setAdCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (isWatchingAd && adCountdown === 0) {
+      setIsWatchingAd(false);
+      setWatermarkRemoved(true);
+      localStorage.setItem('tiny-watermark-removed', 'true');
+    }
+    return () => clearInterval(timer);
+  }, [isWatchingAd, adCountdown]);
 
   return (
     <div className="editor-container">
@@ -752,13 +808,60 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </div>
               </div>
             )}
-
             <label htmlFor="change-file-input" className="change-photo-btn" title="Add photo">
               <Plus size={18} />
             </label>
           </div>
+
+          <div style={{ marginTop: '0.6rem', padding: '0 0.5rem' }}>
+            <button 
+              onClick={() => {
+                if (watermarkRemoved) return;
+                setIsWatchingAd(true);
+                setAdCountdown(10);
+              }} 
+              className={`watermark-removal-btn ${watermarkRemoved ? 'active' : ''}`}
+              disabled={watermarkRemoved}
+            >
+              {watermarkRemoved ? '💎 Watermark Removed' : '🔓 Watch Ad to Remove Watermark'}
+            </button>
+          </div>
           </>
         )}
+        
+        {isWatchingAd && (
+          <div className="ad-overlay">
+            <div className="ad-content">
+              <div className="ad-placeholder">
+                <p style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--primary-dark)' }}>📺 Sponsoring Ad</p>
+                <div className="ad-banner" style={{ minHeight: '200px', position: 'relative', overflow: 'hidden', borderRadius: '12px' }}>
+                  {/* Real Ad Slot */}
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <ins className="adsbygoogle"
+                         style={{ display: 'block' }}
+                         data-ad-client="ca-pub-7219615724537453"
+                         data-ad-slot="8310836177"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                  </div>
+                  
+                  {/* Test Fallback (Visible if real ad is blank or blocked) */}
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa', border: '1px solid #dee2e6' }}>
+                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #eee 25%, transparent 25%, transparent 50%, #eee 50%, #eee 75%, transparent 75%, transparent)', backgroundSize: '20px 20px', opacity: 0.1, position: 'absolute' }}></div>
+                    <p style={{ color: '#adb5bd', fontSize: '0.9rem', fontWeight: 600, zIndex: 2 }}>📺 SAMPLE TEST AD</p>
+                    <p style={{ color: '#ced4da', fontSize: '0.7rem', zIndex: 2, padding: '0 2rem' }}>This message appears because you're on localhost or have an ad blocker.</p>
+                  </div>
+                </div>
+                <p style={{ marginTop: '1rem', color: '#666' }}>Watching this ad allows you to remove the TinyTag watermark for this session.</p>
+                <div className="ad-progress">
+                  <div className="ad-progress-bar" style={{ width: `${(adCountdown / 10) * 100}%` }}></div>
+                </div>
+                <p style={{ fontWeight: 600, color: 'var(--primary)' }}>Closing in {adCountdown}s...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <input id="file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
         <input id="change-file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
       </div>
@@ -792,6 +895,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 onClick={() => updateStyle('showLocation', !currentOverlays.showLocation)}
               >📍 Place</button>
             </div>
+
             
             {currentOverlays.showName && kidProfiles.length > 0 && (
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>

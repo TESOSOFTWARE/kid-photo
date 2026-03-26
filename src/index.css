@@ -1089,3 +1089,91 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   .color-swatch-grid { grid-template-columns: repeat(7, 1fr); }
 }
 
+/* Ad Overlay */
+.ad-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.ad-content {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+
+.ad-placeholder {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.ad-banner {
+  margin: 1rem 0;
+}
+
+.ad-progress {
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  margin: 1.5rem 0 0.5rem;
+  overflow: hidden;
+}
+
+.ad-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  transition: width 1s linear;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Watermark Button */
+.watermark-removal-btn {
+  width: 100%;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  border: 1.5px dashed var(--primary);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--primary-dark);
+}
+
+.watermark-removal-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.15);
+}
+
+.watermark-removal-btn.active {
+  background: rgba(51, 207, 102, 0.1);
+  border: 1px solid #51cf66;
+  color: #2b8a3e;
+  cursor: default;
+}
+
+.watermark-removal-btn:disabled {
+  cursor: default;
+}
+
