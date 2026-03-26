@@ -852,7 +852,7 @@ const PhotoEditor = ({ kidProfiles }) => {
             <label>Text Size</label>
             <DefaultToggle section="typography" />
             <input 
-              type="range" min="10" max="100" 
+              type="range" min="10" max="300" 
               value={currentFontSize} 
               onChange={(e) => updateStyle('fontSize', parseInt(e.target.value))} 
             />
