@@ -444,12 +444,12 @@ canvas {
 }
 
 @media (max-width: 480px) {
-  .change-photo-btn span {
-    display: none; /* Hide text on very small screens, just show icon */
-  }
   .change-photo-btn {
-    padding: 0.5rem;
-    border-radius: 50%;
+    padding: 0.4rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    top: 0.5rem;
+    right: 0.5rem;
   }
 }
 
@@ -468,11 +468,10 @@ canvas {
   max-width: 480px;
   background: rgba(255,255,255,0.85);
   backdrop-filter: blur(10px);
-  padding: 0.4rem;
+  padding: 0.2rem 0.4rem;
   border-radius: 1.5rem;
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
   z-index: 10;
 }
 
@@ -480,7 +479,9 @@ canvas {
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
-  padding: 0.2rem;
+  overflow-y: hidden;
+  padding: 0.6rem 0.2rem; /* Add vertical padding so the absolutely positioned remove button has room and doesn't clip */
+  margin: -0.4rem 0; /* Offset the padding visually */
   scrollbar-width: none;
 }
 
@@ -517,14 +518,16 @@ canvas {
 
 .thumb-remove-btn {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 18px;
-  height: 18px;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
   border-radius: 50%;
   background: #ff4d4d;
   color: white;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -533,7 +536,12 @@ canvas {
   cursor: pointer;
   z-index: 20;
   padding: 0;
+  margin: 0;
+  box-sizing: border-box;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
 }
 
 .thumb-remove-btn:hover {

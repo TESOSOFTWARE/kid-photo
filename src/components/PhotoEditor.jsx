@@ -173,6 +173,17 @@ const PhotoEditor = ({ kidProfiles }) => {
       selected = selected.slice(0, LOAD_LIMIT - files.length);
     }
     const oldLength = files.length;
+    
+    // Fast inline object URL generation for immediate thumbnails
+    const newThumbs = {};
+    selected.forEach((f, i) => {
+      const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || /\.(heic|heif)$/i.test(f.name);
+      if (!isHeic) {
+        newThumbs[oldLength + i] = URL.createObjectURL(f);
+      }
+    });
+    setThumbUrls(prev => ({ ...prev, ...newThumbs }));
+
     setFiles(prev => [...prev, ...selected]);
     setCurrentIndex(oldLength);
     e.target.value = '';
@@ -203,7 +214,7 @@ const PhotoEditor = ({ kidProfiles }) => {
   const currentPositions = photoOverrides[currentIndex]?.positions || positions;
   const currentScales = photoOverrides[currentIndex]?.scales || scales;
   const currentRotations = photoOverrides[currentIndex]?.rotations || rotations;
-  const currentFontSize = photoOverrides[currentIndex]?.fontSize || overlays.fontSize;
+  const currentFontSize = photoOverrides[currentIndex]?.style?.fontSize || overlays.fontSize;
   const currentCustomLoc = photoOverrides[currentIndex]?.customLocation;
   // Merge global defaults with per-photo style overrides
   const currentOverlays = { ...overlays, ...(photoOverrides[currentIndex]?.style || {}) };
@@ -603,7 +614,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       const pos = photoOverrides[i]?.positions || positions;
         const scl = photoOverrides[i]?.scales || scales;
         const rot = photoOverrides[i]?.rotations || rotations;
-        const fsz = photoOverrides[i]?.fontSize || overlays.fontSize;
+        const fsz = photoOverrides[i]?.style?.fontSize || overlays.fontSize;
         const loc = photoOverrides[i]?.customLocation;
         const ov = { ...overlays, ...(photoOverrides[i]?.style || {}) };
         renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, fsz, loc, ov);
@@ -722,7 +733,7 @@ const PhotoEditor = ({ kidProfiles }) => {
             )}
 
             <label htmlFor="change-file-input" className="change-photo-btn">
-              <Plus size={16} /> New Photos
+              <Plus size={16} /> <span>Add Photos</span>
             </label>
           </>
         )}
