@@ -174,7 +174,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
     const oldLength = files.length;
     
-    // Fast inline object URL generation for immediate thumbnails
+    // Immediate thumbnails for JPEGs/PNGs
     const newThumbs = {};
     selected.forEach((f, i) => {
       const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || /\.(heic|heif)$/i.test(f.name);
@@ -187,6 +187,14 @@ const PhotoEditor = ({ kidProfiles }) => {
     setFiles(prev => [...prev, ...selected]);
     setCurrentIndex(oldLength);
     e.target.value = '';
+
+    // Background process HEIC to get real thumbnails if many were added
+    selected.forEach((f, i) => {
+      const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || /\.(heic|heif)$/i.test(f.name);
+      if (isHeic) {
+        setTimeout(() => processFile(f, oldLength + i), 100 * (i + 1));
+      }
+    });
   };
 
   const removePhoto = (idx) => {
@@ -214,10 +222,9 @@ const PhotoEditor = ({ kidProfiles }) => {
   const currentPositions = photoOverrides[currentIndex]?.positions || positions;
   const currentScales = photoOverrides[currentIndex]?.scales || scales;
   const currentRotations = photoOverrides[currentIndex]?.rotations || rotations;
-  const currentFontSize = photoOverrides[currentIndex]?.style?.fontSize || overlays.fontSize;
-  const currentCustomLoc = photoOverrides[currentIndex]?.customLocation;
-  // Merge global defaults with per-photo style overrides
   const currentOverlays = { ...overlays, ...(photoOverrides[currentIndex]?.style || {}) };
+  const currentFontSize = currentOverlays.fontSize;
+  const currentCustomLoc = photoOverrides[currentIndex]?.customLocation || overlays.customLocation;
 
   const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, fsz, customLoc, ov) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
@@ -571,7 +578,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       // Swipe detection
       const touch = e.touches[0];
       const moveX = touch.clientX - touchState.current.startX;
-      if (Math.abs(moveX) > 100 && !draggingRef.current) {
+      if (Math.abs(moveX) > 50 && !draggingRef.current) {
          if (moveX > 0 && currentIndex > 0) {
            setCurrentIndex(prev => prev - 1);
            touchState.current.startX = touch.clientX; // Reset to avoid multiple triggers
@@ -691,19 +698,34 @@ const PhotoEditor = ({ kidProfiles }) => {
           </label>
         ) : (
           <>
+            <div 
+            className="editor-canvas-container"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={() => { 
+              setDragging(null); 
+              draggingRef.current = null; 
+              touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; 
+            }}
+          >
             <canvas 
               ref={canvasRef} 
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={() => { setDragging(null); draggingRef.current = null; }}
               onMouseLeave={() => { setDragging(null); draggingRef.current = null; }}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={() => { setDragging(null); draggingRef.current = null; touchState.current = { initialDist: null, initialScale: null }; }}
               style={{ touchAction: 'none' }}
             />
+          </div>
 
-            {/* Thumbnail Slider */}
+          {/* Thumbnail Navigation Row — sits BELOW the canvas, not over it */}
+          <div className="thumbnail-controls-row">
+            {files.length > 0 && (
+              <div className="photo-info-badge">
+                {currentIndex + 1} / {files.length}
+              </div>
+            )}
+
             {files.length >= 1 && (
               <div className="thumbnail-slider-container">
                 <div className="thumbnail-slider">
@@ -718,7 +740,6 @@ const PhotoEditor = ({ kidProfiles }) => {
                       ) : (
                         <div className="thumbnail-placeholder">{idx + 1}</div>
                       )}
-                      {/* Remove button on active thumbnail */}
                       {currentIndex === idx && (
                         <button
                           className="thumb-remove-btn"
@@ -732,19 +753,14 @@ const PhotoEditor = ({ kidProfiles }) => {
               </div>
             )}
 
-            <label htmlFor="change-file-input" className="change-photo-btn">
-              <Plus size={16} /> <span>Add Photos</span>
+            <label htmlFor="change-file-input" className="change-photo-btn" title="Add photo">
+              <Plus size={18} />
             </label>
+          </div>
           </>
         )}
         <input id="file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
         <input id="change-file-input" type="file" multiple accept="image/*,image/heic,image/heif" onChange={handleFileChange} style={{ display: 'none' }} />
-        
-        {files.length > 0 && (
-          <div className="photo-info-badge">
-            {currentIndex + 1} / {files.length}
-          </div>
-        )}
       </div>
 
       <div className="toolbar">
