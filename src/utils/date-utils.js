@@ -55,13 +55,27 @@ export const calculateDiff = (targetDate, referenceDate = new Date(), format = '
   const totalMonths = diff.years * 12 + diff.months;
 
   switch (format) {
-    case 'd': return `${totalDays}d`;
+    case 'y': return `${diff.years}y`;
+    case 'y-m': {
+      let parts = [];
+      if (diff.years > 0) parts.push(`${diff.years}y`);
+      if (diff.months > 0) parts.push(`${diff.months}m`);
+      return parts.length ? parts.join(' ') : '0m';
+    }
+    case 'y-m-d': {
+      let parts = [];
+      if (diff.years > 0) parts.push(`${diff.years}y`);
+      if (diff.months > 0) parts.push(`${diff.months}m`);
+      if (diff.days > 0) parts.push(`${diff.days}d`);
+      return parts.length ? parts.join(' ') : '0d';
+    }
     case 'm-d': {
       let parts = [];
       if (totalMonths > 0) parts.push(`${totalMonths}m`);
       if (diff.days > 0) parts.push(`${diff.days}d`);
       return parts.length ? parts.join(' ') : '0d';
     }
+    case 'd': return `${totalDays}d`;
     case 'y-m-d-h': {
       let parts = [];
       if (diff.years > 0) parts.push(`${diff.years}y`);
@@ -82,7 +96,14 @@ export const calculateDiff = (targetDate, referenceDate = new Date(), format = '
       if (minutes > 0) parts.push(`${minutes}m`);
       return parts.length ? parts.join(' ') : '0m';
     }
-    default: return `${totalDays}d`;
+    default: {
+      // Default to y-m-d logic if format is unknown
+      let parts = [];
+      if (diff.years > 0) parts.push(`${diff.years}y`);
+      if (diff.months > 0) parts.push(`${diff.months}m`);
+      if (diff.days > 0) parts.push(`${diff.days}d`);
+      return parts.length ? parts.join(' ') : '0d';
+    }
   }
 };
 

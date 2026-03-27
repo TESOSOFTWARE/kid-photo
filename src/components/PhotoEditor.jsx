@@ -251,7 +251,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     /* ── 1. Render Auto-Stacking Text Group ── */
     const lines = [];
-    const photoDate = meta?.dateTaken || (ov.customPhotoDate ? new Date(ov.customPhotoDate) : null);
+    const photoDate = (ov.customPhotoDate ? new Date(ov.customPhotoDate) : meta?.dateTaken) || null;
 
     // NAME / EVENT Line
     if (ov.showName && kidProfiles.length > 0) {
@@ -265,9 +265,9 @@ const PhotoEditor = ({ kidProfiles }) => {
           if (evt.type === 'countdown' || evt.type === 'countup') {
             let targetDate = parseLocalDateTime(evt.date, evt.time);
             
-            // For countdowns, users usually expect the "live" remaining time (relative to today).
-            // For countups (age), we calculate relative to when the photo was taken.
-            const referenceDate = (evt.type === 'countdown' || !photoDate) ? new Date() : new Date(photoDate);
+            // The user wants calculation to be relative to the photo's date/time by default
+            // Unless no photoDate is available (then fallback to today)
+            const referenceDate = photoDate ? new Date(photoDate) : new Date();
             
             if (evt.type === 'countdown' && evt.isRecurring) {
               targetDate = getNextRecurringDate(evt.date, evt.frequency);
@@ -448,33 +448,46 @@ const PhotoEditor = ({ kidProfiles }) => {
   // Keys belonging to each section
   const SECTIONS = {
     visibility: ['showName', 'showDate', 'showLocation', 'hiddenNames'],
-    typography: ['font', 'color', 'fontSize'], // Since Font, Color, Size all fall under this, they share the toggle state
-    rotation: ['rotations'], // We'll map rotation override detection here
-    date: ['customPhotoDate'],
-    location: ['locationDetailMode'],
-    stickers: ['selectedIcons'],
+    font: ['font'],
+    color: ['color'],
+    fontSize: ['fontSize'],
+    rotations: ['rotations'],
+    customPhotoDate: ['customPhotoDate'],
+    locationDetailMode: ['locationDetailMode'],
+    selectedIcons: ['selectedIcons'],
   };
   const isDefaultSection = (section) => {
-    if (section === 'rotation') {
-      const rot = photoOverrides[currentIndex]?.rotations;
-      return !rot || Object.keys(rot).length === 0;
-    }
     const keys = SECTIONS[section] || [];
-    const style = photoOverrides[currentIndex]?.style || {};
+    const override = photoOverrides[currentIndex] || {};
+    
+    // Check main override fields (rotations, positions, etc)
+    if (section === 'rotations' || section === 'positions' || section === 'scales') {
+      const fieldData = override[section];
+      return !fieldData || Object.keys(fieldData).length === 0;
+    }
+    if (section === 'customLocation') return !override.customLocation;
+
+    // Check style overrides
+    const style = override.style || {};
     return !keys.some(k => k in style);
   };
+
   const resetToDefault = (section) => {
-    if (section === 'rotation') {
-      setPhotoOverrides(prev => {
-        const curr = { ...(prev[currentIndex] || {}) };
-        delete curr.rotations;
-        return { ...prev, [currentIndex]: curr };
-      });
-      return;
-    }
     const keys = SECTIONS[section] || [];
     setPhotoOverrides(prev => {
       const curr = { ...(prev[currentIndex] || {}) };
+      
+      if (section === 'rotations' || section === 'positions' || section === 'scales') {
+        const next = { ...curr };
+        delete next[section];
+        return { ...prev, [currentIndex]: next };
+      }
+      if (section === 'customLocation') {
+        const next = { ...curr };
+        delete next.customLocation;
+        return { ...prev, [currentIndex]: next };
+      }
+
       const style = { ...(curr.style || {}) };
       keys.forEach(k => delete style[k]);
       return { ...prev, [currentIndex]: { ...curr, style } };
@@ -787,8 +800,33 @@ const PhotoEditor = ({ kidProfiles }) => {
             />
           </div>
 
-          {/* Thumbnail Navigation Row — sits BELOW the canvas, not over it */}
-          <div className="thumbnail-controls-row">
+            <div className="mobile-pill-nav">
+              {!watermarkRemoved && (
+                <button 
+                  onClick={() => {
+                    setIsWatchingAd(true);
+                    setAdCountdown(10);
+                  }} 
+                  className="pill-watermark-btn"
+                >
+                  ✨ No Watermark
+                </button>
+              )}
+              <div className="pill-pager">
+                <button onClick={() => setCurrentIndex(prev => (prev > 0 ? prev - 1 : files.length - 1))}>
+                  <ChevronLeft size={18} />
+                </button>
+                <span>{currentIndex + 1} / {files.length}</span>
+                <button onClick={() => setCurrentIndex(prev => (prev < files.length - 1 ? prev + 1 : 0))}>
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+              <label htmlFor="change-file-input" className="pill-add-btn">
+                <Plus size={18} />
+              </label>
+            </div>
+
+            <div className="thumbnail-controls-row desktop-only">
             {files.length > 0 && (
               <div className="photo-info-badge">
                 {currentIndex + 1} / {files.length}
@@ -826,7 +864,7 @@ const PhotoEditor = ({ kidProfiles }) => {
             </label>
           </div>
 
-          <div style={{ marginTop: '0.6rem', padding: '0 0.5rem' }}>
+          <div className="desktop-only" style={{ marginTop: '0.6rem', padding: '0 0.5rem' }}>
             <button 
               onClick={() => {
                 if (watermarkRemoved) return;
@@ -939,7 +977,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label><Type size={14} /> Font</label>
-            <DefaultToggle section="typography" />
+            <DefaultToggle section="font" />
             <div className="custom-select-container" ref={fontPickerRef}>
               <button 
                 className="font-select-trigger" 
@@ -967,7 +1005,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Text Size</label>
-            <DefaultToggle section="typography" />
+            <DefaultToggle section="fontSize" />
             <input 
               type="range" min="10" max="300" 
               value={currentFontSize} 
@@ -977,7 +1015,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Font Color</label>
-            <DefaultToggle section="typography" />
+            <DefaultToggle section="color" />
             <div className="color-swatches" style={{ marginTop: '0.4rem' }}>
               {COLORS.map(c => (
                 <div 
@@ -992,7 +1030,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Text Rotation</label>
-            <DefaultToggle section="rotation" />
+            <DefaultToggle section="rotations" />
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <input 
                 style={{ flex: 1 }}
@@ -1010,13 +1048,17 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label>📅 Date Fallback</label>
-            <DefaultToggle section="date" />
+            <DefaultToggle section="customPhotoDate" />
             <input 
               type="date"
               value={currentOverlays.customPhotoDate || ''}
               onChange={(e) => updateStyle('customPhotoDate', e.target.value)}
             />
-            {metadata?.dateTaken && (
+            {currentOverlays.customPhotoDate ? (
+              <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
+                ✓ Priority: Date Fallback
+              </p>
+            ) : metadata?.dateTaken && (
               <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
                 ✓ Currently rendering from EXIF
               </p>
@@ -1036,7 +1078,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label>Location Auto-Format</label>
-            <DefaultToggle section="location" />
+            <DefaultToggle section="locationDetailMode" />
             <select 
               value={currentOverlays.locationDetailMode}
               onChange={e => updateStyle('locationDetailMode', e.target.value)}
@@ -1052,7 +1094,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="toolbar-section">
           <div className="control-item">
             <label><Smile size={14} /> Stickers</label>
-            <DefaultToggle section="stickers" />
+            <DefaultToggle section="selectedIcons" />
             <div className="icon-grid">
               {CUTE_ICONS.map(icon => (
                 <button 
