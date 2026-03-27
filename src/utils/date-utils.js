@@ -62,19 +62,25 @@ export const calculateDiff = (targetDate, referenceDate = new Date(), format = '
       if (diff.days > 0) parts.push(`${diff.days}d`);
       return parts.length ? parts.join(' ') : '0d';
     }
-    case 'y-m-d': {
+    case 'y-m-d-h': {
       let parts = [];
       if (diff.years > 0) parts.push(`${diff.years}y`);
       if (diff.months > 0) parts.push(`${diff.months}m`);
       if (diff.days > 0) parts.push(`${diff.days}d`);
-      return parts.length ? parts.join(' ') : '0d';
+      const hours = Math.floor(((end - start) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      if (hours > 0) parts.push(`${hours}h`);
+      return parts.length ? parts.join(' ') : '0h';
     }
-    case 'y': return `${diff.years}y`;
-    case 'y-m': {
-       let parts = [];
-       if (diff.years > 0) parts.push(`${diff.years}y`);
-       if (diff.months > 0) parts.push(`${diff.months}m`);
-       return parts.length ? parts.join(' ') : '0m';
+    case 'd-h-m': {
+      const totalMs = end - start;
+      const days = Math.floor(totalMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((totalMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+      let parts = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
+      return parts.length ? parts.join(' ') : '0m';
     }
     default: return `${totalDays}d`;
   }

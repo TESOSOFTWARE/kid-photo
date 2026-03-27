@@ -6,7 +6,9 @@ const EMPTY_FORM = {
   name: '',
   type: 'countup',
   date: '',
+  time: '00:00',
   format: 'y-m-d',
+  prefix: '',
   label: '',
   isRecurring: false,
   frequency: 'yearly'
@@ -18,18 +20,34 @@ const FORMAT_OPTIONS = [
   { value: 'y-m-d', label: 'Y · M · D' },
   { value: 'y', label: 'Years' },
   { value: 'y-m', label: 'Y & Mo' },
+  { value: 'y-m-d-h', label: 'Y · M · D · H' },
+  { value: 'd-h-m', label: 'D · H · M' },
 ];
 
 const computeDiff = (event) => {
   if (!event.date) return '—';
-  let targetDate = new Date(event.date);
+  
+  let dateStr = event.date;
+  if (event.type === 'countdown' && event.time) {
+    dateStr = `${event.date}T${event.time}`;
+  }
+  
+  let targetDate = new Date(dateStr);
   const now = new Date();
+  
   if (event.type === 'countdown' && event.isRecurring) {
     targetDate = getNextRecurringDate(event.date, event.frequency);
+    // Reuse the time if it's recurring
+    if (event.time) {
+      const [h, m] = event.time.split(':');
+      targetDate.setHours(h, m, 0, 0);
+    }
   }
+  
   const diff = calculateDiff(targetDate, now, event.format || 'y-m-d');
+  const prefix = event.prefix ? `${event.prefix} ` : '';
   const suffix = event.label ? ` ${event.label}` : '';
-  return `${diff}${suffix}`;
+  return `${prefix}${diff}${suffix}`;
 };
 
 const TagManager = ({ onProfileChange }) => {
@@ -161,9 +179,19 @@ const TagManager = ({ onProfileChange }) => {
       </div>
 
       <div className="input-group">
-        <label>{formData.type === 'countdown' ? 'End Date' : 'Start Date'}</label>
-        <input type="date" value={formData.date}
-          onChange={(e) => updateField('date', e.target.value)} />
+        <label style={{ fontSize: '0.85rem' }}>{formData.type === 'countdown' ? 'Target Date/Event Date' : 'Start Date/Date Of Birth'}</label>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input type="date" value={formData.date}
+            onChange={(e) => updateField('date', e.target.value)} 
+            style={{ flex: 1.8, minWidth: 0, padding: '0.6rem 0.6rem', fontSize: '0.9rem' }}
+          />
+          {formData.type === 'countdown' && (
+            <input type="time" value={formData.time || '00:00'}
+              onChange={(e) => updateField('time', e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: '0.6rem 0.5rem', fontSize: '0.9rem' }}
+            />
+          )}
+        </div>
       </div>
 
       {formData.type === 'countdown' && (
@@ -202,14 +230,27 @@ const TagManager = ({ onProfileChange }) => {
         </div>
       </div>
 
-      <div className="input-group">
-        <label>Suffix <span style={{ fontWeight: 400, opacity: 0.55 }}>(optional, e.g. "old" / "left")</span></label>
-        <input
-          type="text"
-          value={formData.label}
-          onChange={(e) => updateField('label', e.target.value)}
-          placeholder="Leave blank for no suffix"
-        />
+      <div className="input-group" style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <label style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>Prefix</label>
+          <input
+            type="text"
+            value={formData.prefix || ''}
+            onChange={(e) => updateField('prefix', e.target.value)}
+            placeholder="e.g. 'Since'"
+            style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.85rem' }}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <label style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>Suffix</label>
+          <input
+            type="text"
+            value={formData.label}
+            onChange={(e) => updateField('label', e.target.value)}
+            placeholder="e.g. 'old'"
+            style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.85rem' }}
+          />
+        </div>
       </div>
 
       <button className="primary-btn save-event-btn" onClick={isNew ? handleAdd : handleUpdate}>

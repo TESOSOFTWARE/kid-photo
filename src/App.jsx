@@ -16,7 +16,7 @@ function App() {
           <Heart className="logo-icon" size={36} fill="var(--primary)" color="var(--primary)" />
           <div>
             <h1>TinyTag</h1>
-            <p className="subtitle">Capture every milestone</p>
+            <p className="subtitle">Little moments, lasting memories</p>
           </div>
         </header>
         <TagManager onProfileChange={setKidProfiles} />
