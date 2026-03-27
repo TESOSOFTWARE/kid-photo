@@ -384,7 +384,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     /* ── 3. Render Watermark ── */
     if (!watermarkRemoved) {
-      const watermarkText = "✨ Made with TinyTag";
+      const watermarkText = "✨ Made with TinyTag.app";
       ctx.save();
       const wmSize = Math.max(20, 32 * (canvasWidth / 1000));
       ctx.font = `700 ${wmSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
