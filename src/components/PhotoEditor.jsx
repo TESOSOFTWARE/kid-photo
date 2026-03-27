@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
-import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDate } from '../utils/date-utils';
+import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
 import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
@@ -263,14 +263,24 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           // New TinyTag event format
           if (evt.type === 'countdown' || evt.type === 'countup') {
-            let targetDate = new Date(evt.date);
-            const now = photoDate ? new Date(photoDate) : new Date();
+            let targetDate = parseLocalDateTime(evt.date, evt.time);
+            
+            // For countdowns, users usually expect the "live" remaining time (relative to today).
+            // For countups (age), we calculate relative to when the photo was taken.
+            const referenceDate = (evt.type === 'countdown' || !photoDate) ? new Date() : new Date(photoDate);
+            
             if (evt.type === 'countdown' && evt.isRecurring) {
               targetDate = getNextRecurringDate(evt.date, evt.frequency);
+              if (evt.time) {
+                const [h, m] = evt.time.split(':');
+                targetDate.setHours(h, m, 0, 0);
+              }
             }
-            const diff = calculateDiff(targetDate, now, evt.format || 'y-m-d');
+            
+            const diff = calculateDiff(targetDate, referenceDate, evt.format || 'y-m-d');
+            const prefix = evt.prefix ? `${evt.prefix} ` : '';
             const suffix = evt.label ? ` ${evt.label}` : '';
-            return `${n} · ${diff}${suffix}`;
+            return `${n} · ${prefix}${diff}${suffix}`;
           }
 
           // Legacy countup via dob
@@ -635,6 +645,8 @@ const PhotoEditor = ({ kidProfiles }) => {
   const getFileName = (meta, idx) => `TinyTag_${kidProfiles[0]?.name || 'Memory'}_${idx+1}.jpg`;
 
   const downloadImage = async (saveAllFlag = false) => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     if (saveAllFlag && files.length > 1) {
       setSavingAll(true);
       const generatedFiles = [];
@@ -648,7 +660,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         const ratio = Math.min(2000 / data.image.width, 1);
         tempCanvas.width = data.image.width * ratio;
         tempCanvas.height = data.image.height * ratio;
-      const pos = photoOverrides[i]?.positions || positions;
+        const pos = photoOverrides[i]?.positions || positions;
         const scl = photoOverrides[i]?.scales || scales;
         const rot = photoOverrides[i]?.rotations || rotations;
         const fsz = photoOverrides[i]?.style?.fontSize || overlays.fontSize;
@@ -662,7 +674,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       
       setSavingAll(false);
 
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
+      if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
         try {
           await navigator.share({ files: generatedFiles, title: 'TinyTag Memories 📸' });
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
@@ -670,30 +682,31 @@ const PhotoEditor = ({ kidProfiles }) => {
         } catch (e) { if (e.name !== 'AbortError') console.error(e); }
       }
       
-      // Fallback desktop manual download loop
+      // Desktop manual download loop
       generatedFiles.forEach((file, i) => {
         setTimeout(() => {
           const url = URL.createObjectURL(file);
           const a = document.createElement('a'); 
           a.download = file.name; a.href = url; a.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }, i * 500); // staggering downloads
+        }, i * 500);
       });
       confetti({ particleCount: 180, spread: 100, origin: { y: 0.6 } });
 
     } else {
-      // Single download (current)
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.toBlob(async (blob) => {
         const file = new File([blob], getFileName(metadata, currentIndex), { type: 'image/jpeg' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        
+        if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({ files: [file], title: 'TinyTag Memory 📸' });
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             return;
           } catch (e) { if (e.name === 'AbortError') return; }
         }
+        
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.download = file.name; a.href = url; a.click();
         URL.revokeObjectURL(url);

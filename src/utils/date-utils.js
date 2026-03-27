@@ -86,8 +86,15 @@ export const calculateDiff = (targetDate, referenceDate = new Date(), format = '
   }
 };
 
+export const parseLocalDateTime = (dateStr, timeStr = '00:00') => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = (timeStr || '00:00').split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+};
+
 export const getNextRecurringDate = (dateStr, frequency = 'yearly') => {
-  const date = new Date(dateStr);
+  const date = parseLocalDateTime(dateStr);
   const now = new Date();
   let next = new Date(now.getFullYear(), date.getMonth(), date.getDate());
 

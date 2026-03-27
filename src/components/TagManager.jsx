@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
-import { calculateDiff, getNextRecurringDate } from '../utils/date-utils';
+import { calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
 
 const EMPTY_FORM = {
   name: '',
@@ -27,17 +27,11 @@ const FORMAT_OPTIONS = [
 const computeDiff = (event) => {
   if (!event.date) return '—';
   
-  let dateStr = event.date;
-  if (event.type === 'countdown' && event.time) {
-    dateStr = `${event.date}T${event.time}`;
-  }
-  
-  let targetDate = new Date(dateStr);
+  let targetDate = parseLocalDateTime(event.date, event.time);
   const now = new Date();
   
   if (event.type === 'countdown' && event.isRecurring) {
     targetDate = getNextRecurringDate(event.date, event.frequency);
-    // Reuse the time if it's recurring
     if (event.time) {
       const [h, m] = event.time.split(':');
       targetDate.setHours(h, m, 0, 0);
