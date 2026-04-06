@@ -615,39 +615,52 @@ const PhotoEditor = ({ kidProfiles }) => {
       const t = e.touches[0];
       const key = hitElement(t.clientX, t.clientY);
       touchState.current.startX = t.clientX;
-      if (key) { setDragging(key); draggingRef.current = key; touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; }
+      touchState.current.startY = t.clientY;
+      touchState.current.isSwiping = false; // reset swiping state
+      
+      if (key) { 
+        setDragging(key); 
+        draggingRef.current = key; 
+        touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; 
+      } else {
+        setDragging(null);
+        draggingRef.current = null;
+      }
     } else if (e.touches.length === 2 && draggingRef.current) {
-      touchState.current = { initialDist: getTouchDist(e.touches), initialScale: currentScales[draggingRef.current] || 1 };
+      touchState.current = { ...touchState.current, initialDist: getTouchDist(e.touches), initialScale: currentScales[draggingRef.current] || 1 };
     }
   };
   const handleTouchMove = (e) => {
     const key = draggingRef.current;
-    if (!key || !canvasRef.current) return;
+    if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
+    
     if (e.touches.length === 1 && !touchState.current.initialDist) {
-      const x = (e.touches[0].clientX - rect.left) / rect.width;
-      const y = (e.touches[0].clientY - rect.top) / rect.height;
-      
-      // Swipe detection
       const touch = e.touches[0];
       const moveX = touch.clientX - touchState.current.startX;
-      if (Math.abs(moveX) > 50 && !draggingRef.current) {
-         if (moveX > 0 && currentIndex > 0) {
-           setCurrentIndex(prev => prev - 1);
-           touchState.current.startX = touch.clientX; // Reset to avoid multiple triggers
-         } else if (moveX < 0 && currentIndex < files.length - 1) {
-           setCurrentIndex(prev => prev + 1);
-           touchState.current.startX = touch.clientX;
+      const moveY = touch.clientY - touchState.current.startY;
+      
+      // Swipe detection (only if not currently dragging a sticker)
+      if (!key && !touchState.current.isSwiping) {
+         if (Math.abs(moveX) > Math.abs(moveY) && Math.abs(moveX) > 40) {
+            if (moveX > 0 && currentIndex > 0) {
+              setCurrentIndex(prev => prev - 1);
+              touchState.current.isSwiping = true;
+            } else if (moveX < 0 && currentIndex < files.length - 1) {
+              setCurrentIndex(prev => prev + 1);
+              touchState.current.isSwiping = true;
+            }
          }
-         return;
       }
 
-      if (draggingRef.current) {
+      if (key) {
+        const x = (touch.clientX - rect.left) / rect.width;
+        const y = (touch.clientY - rect.top) / rect.height;
         updateOverride('positions', p => ({
           ...p, [key]: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
         }));
       }
-    } else if (e.touches.length === 2 && touchState.current.initialDist) {
+    } else if (e.touches.length === 2 && touchState.current.initialDist && key) {
       const pinchScale = getTouchDist(e.touches) / touchState.current.initialDist;
       updateOverride('scales', s => ({
         ...s, [key]: Math.max(0.3, Math.min(6, touchState.current.initialScale * pinchScale))
@@ -848,9 +861,20 @@ const PhotoEditor = ({ kidProfiles }) => {
                   <ChevronRight size={18} />
                 </button>
               </div>
-              <label htmlFor="change-file-input" className="pill-add-btn">
+              <label htmlFor="change-file-input" className="pill-add-btn" title="Add photo">
                 <Plus size={18} />
               </label>
+              <button 
+                onClick={() => {
+                  if (window.confirm("Remove this photo?")) {
+                    removePhoto(currentIndex);
+                  }
+                }} 
+                className="pill-remove-btn" 
+                title="Remove photo"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
 
             <div className="thumbnail-controls-row desktop-only">
