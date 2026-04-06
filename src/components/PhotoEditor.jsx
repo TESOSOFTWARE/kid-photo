@@ -177,13 +177,8 @@ const PhotoEditor = ({ kidProfiles }) => {
     setWatermarkRemoved(false);
     localStorage.setItem('tiny-watermark-removed', 'false');
 
-    if (files.length >= LOAD_LIMIT) {
-      alert(`Limit of ${LOAD_LIMIT} photos reached.`);
-      return;
-    }
-
     if (files.length + selected.length > LOAD_LIMIT) {
-      alert(`Limited to ${LOAD_LIMIT} photos for stability. Only the first ${LOAD_LIMIT - files.length} additional photos were added.`);
+      alert(`Limited to ${LOAD_LIMIT} photos for stability. The rest were skipped.`);
       selected = selected.slice(0, LOAD_LIMIT - files.length);
     }
     const oldLength = files.length;
@@ -826,11 +821,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                   <ChevronRight size={18} />
                 </button>
               </div>
-              <label 
-                htmlFor={files.length >= LOAD_LIMIT ? "" : "change-file-input"} 
-                className={`pill-add-btn ${files.length >= LOAD_LIMIT ? 'disabled' : ''}`}
-                onClick={() => files.length >= LOAD_LIMIT && alert(`Limit of ${LOAD_LIMIT} photos reached.`)}
-              >
+              <label htmlFor="change-file-input" className="pill-add-btn">
                 <Plus size={18} />
               </label>
             </div>
@@ -868,12 +859,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </div>
               </div>
             )}
-            <label 
-              htmlFor={files.length >= LOAD_LIMIT ? "" : "change-file-input"} 
-              className={`change-photo-btn ${files.length >= LOAD_LIMIT ? 'disabled' : ''}`} 
-              title={files.length >= LOAD_LIMIT ? "Limit reached" : "Add photo"}
-              onClick={() => files.length >= LOAD_LIMIT && alert(`Limit of ${LOAD_LIMIT} photos reached.`)}
-            >
+            <label htmlFor="change-file-input" className="change-photo-btn" title="Add photo">
               <Plus size={18} />
             </label>
           </div>
