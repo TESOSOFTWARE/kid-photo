@@ -1307,47 +1307,78 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  margin-bottom: 3rem;
-  text-align: left;
+  margin-bottom: 3.5rem;
+  text-align: center;
+  position: relative;
+}
+
+/* Horizontal Connector Line for Desktop */
+@media (min-width: 901px) {
+  .hero-steps::before {
+    content: '';
+    position: absolute;
+    top: 39px; /* Half of icon height + margin-top */
+    left: 15%;
+    right: 15%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+    z-index: 0;
+  }
 }
 
 .step-card {
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border-radius: 1.5rem;
-  transition: transform 0.2s;
+  padding: 2rem 1.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .step-card:hover {
-  transform: translateY(-5px);
-  background: var(--primary-light);
+  transform: translateY(-8px);
+  background: white;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+  border-color: var(--primary-light);
 }
 
 .step-icon {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   background: white;
-  border-radius: 12px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary);
-  margin-bottom: 1rem;
-  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  transition: all 0.3s ease;
+}
+
+.step-card:hover .step-icon {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
 }
 
 .step-card h3 {
   font-family: 'Outfit', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .step-card p {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-light);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .hero-cta-group {
