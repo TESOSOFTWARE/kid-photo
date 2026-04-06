@@ -1249,3 +1249,138 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   color: #2b8a3e;
 }
 
+
+/* Welcome Hero Section */
+.welcome-hero {
+  max-width: 800px;
+  width: 90%;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 2.5rem;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--glass-border);
+  text-align: center;
+  margin: auto;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.hero-tagline {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-radius: 2rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.welcome-hero h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 1rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.welcome-hero .subtitle {
+  font-size: 1.1rem;
+  color: var(--text-light);
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.6;
+}
+
+.hero-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  text-align: left;
+}
+
+.step-card {
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 1.5rem;
+  transition: transform 0.2s;
+}
+
+.step-card:hover {
+  transform: translateY(-5px);
+  background: var(--primary-light);
+}
+
+.step-icon {
+  width: 48px;
+  height: 48px;
+  background: white;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.step-card h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.step-card p {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.hero-cta-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hero-upload-btn {
+  padding: 1.2rem 3rem;
+  font-size: 1.2rem;
+  border-radius: 4rem;
+  height: auto;
+  cursor: pointer;
+}
+
+.privacy-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .hero-steps {
+    grid-template-columns: 1fr;
+  }
+  .main-content, .editor-main {
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .welcome-hero {
+    padding: 2rem 1rem;
+    border-radius: 1.5rem;
+  }
+  .welcome-hero h1 {
+    font-size: 1.75rem;
+  }
+}

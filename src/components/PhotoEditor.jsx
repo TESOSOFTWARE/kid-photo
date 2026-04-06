@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
 import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
-import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap } from 'lucide-react';
+import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
 
@@ -773,11 +773,38 @@ const PhotoEditor = ({ kidProfiles }) => {
         )}
         
         {files.length === 0 ? (
-          <label className="upload-placeholder" htmlFor="file-input">
-             <Plus size={64} strokeWidth={2.5} />
-             <p>Select Photos</p>
-             <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supports multiple iPhone, Samsung, Android photos</span>
-          </label>
+          <div className="welcome-hero">
+            <span className="hero-tagline">✨ Milestone & Age Tracker for Parents</span>
+            <h1>Preserve Every Tiny Moment</h1>
+            <p className="subtitle">Automatically calculate ages, track milestones, and add beautiful countdowns to your photos. The perfect batch editor for parenting memories.</p>
+
+            <div className="hero-steps">
+               <div className="step-card">
+                  <div className="step-icon"><Sparkles size={24} /></div>
+                  <h3>1. Create Tags</h3>
+                  <p>Add your child's birth date or special events like "First Steps" in the sidebar.</p>
+               </div>
+               <div className="step-card">
+                  <div className="step-icon"><Camera size={24} /></div>
+                  <h3>2. Select Photos</h3>
+                  <p>Upload your favorite snaps from any device. We support high-quality batch editing.</p>
+               </div>
+               <div className="step-card">
+                  <div className="step-icon"><Check size={24} /></div>
+                  <h3>3. Save & Share</h3>
+                  <p>Customize labels, move stickers, and save your memories instantly.</p>
+               </div>
+            </div>
+
+            <div className="hero-cta-group">
+               <label className="primary-btn hero-upload-btn" htmlFor="file-input">
+                  <Download size={22} /> Select Photos to Start
+               </label>
+               <div className="privacy-notice">
+                  <Sparkles size={14} /> 100% Private: Your photos never leave your device.
+               </div>
+            </div>
+          </div>
         ) : (
           <>
             <div 
