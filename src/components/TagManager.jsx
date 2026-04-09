@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { trackEvent, ANALYTICS_EVENTS } from '../utils/analytics.js';
 import { calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
 
 const EMPTY_FORM = {

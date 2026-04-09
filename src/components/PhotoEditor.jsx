@@ -4,6 +4,7 @@ import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDat
 import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
+import { trackEvent, ANALYTICS_EVENTS } from '../utils/analytics.js';
 
 const CUTE_ICONS = [
   { id: 'heart', component: Heart, color: '#ff6b6b' },
@@ -197,6 +198,8 @@ const PhotoEditor = ({ kidProfiles }) => {
     setCurrentIndex(oldLength);
     e.target.value = '';
 
+    trackEvent(ANALYTICS_EVENTS.UPLOAD_PHOTOS, { count: selected.length });
+
     // Background process HEIC to get real thumbnails if many were added
     selected.forEach((f, i) => {
       const isHeic = f.type === 'image/heic' || f.type === 'image/heif' || /\.(heic|heif)$/i.test(f.name);
@@ -208,6 +211,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const removePhoto = (idx) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));
+    trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO);
     setCache(prev => {
       const next = {};
       Object.keys(prev).forEach(k => { const n = parseInt(k); if (n < idx) next[n] = prev[n]; else if (n > idx) next[n - 1] = prev[n]; });
@@ -435,6 +439,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     setScales(lastState.scales);
     setRotations(lastState.rotations);
     setHistory(prev => prev.slice(0, -1));
+    trackEvent(ANALYTICS_EVENTS.UNDO_CLICK);
   };
 
   const prevDragging = useRef(null);
@@ -718,6 +723,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         }, i * 500);
       });
       confetti({ particleCount: 180, spread: 100, origin: { y: 0.6 } });
+      trackEvent(ANALYTICS_EVENTS.SAVE_ALL_PHOTOS, { count: generatedFiles.length });
 
     } else {
       const canvas = canvasRef.current;
@@ -729,14 +735,16 @@ const PhotoEditor = ({ kidProfiles }) => {
           try {
             await navigator.share({ files: [file], title: 'TinyTag Memory 📸' });
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            trackEvent(ANALYTICS_EVENTS.SAVE_PHOTO);
             return;
           } catch (e) { if (e.name === 'AbortError') return; }
         }
         
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.download = file.name; a.href = url; a.click();
+        const a = document.createElement('a');        a.download = file.name; a.href = url; a.click();
         URL.revokeObjectURL(url);
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        trackEvent(ANALYTICS_EVENTS.SAVE_PHOTO);
       }, 'image/jpeg', 0.95);
     }
   };
@@ -771,6 +779,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       setIsWatchingAd(false);
       setWatermarkRemoved(true);
       localStorage.setItem('tiny-watermark-removed', 'true');
+      trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVED);
     }
     return () => clearInterval(timer);
   }, [isWatchingAd, adCountdown]);
@@ -846,6 +855,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                   onClick={() => {
                     setIsWatchingAd(true);
                     setAdCountdown(10);
+                    trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVE_START);
                   }} 
                   className="pill-watermark-btn"
                 >
@@ -1156,6 +1166,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                     // Seed initial position to exactly center so it's not random on render
                     updateOverride('positions', p => ({ ...p, [newId]: { x: 0.5, y: 0.5 } }));
                     updateStyle('selectedIcons', [...(currentOverlays.selectedIcons || []), { id: newId, type: icon.id }]);
+                    trackEvent(ANALYTICS_EVENTS.STICKER_ADD, { sticker_type: icon.id });
                   }}
                   style={{ color: icon.color }}
                 >
