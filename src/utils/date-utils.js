@@ -92,22 +92,9 @@ export const calculateDiff = (targetDate, referenceDate = new Date(), format = '
       const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
       let parts = [];
       if (days > 0) parts.push(`${days}d`);
-      if (hours > 0 || days > 0) parts.push(`${hours}h`);
-      if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0) parts.push(`${minutes}m`);
       return parts.length ? parts.join(' ') : '0m';
-    }
-    case 'd-h-m-s': {
-      const totalMs = end - start;
-      const days = Math.floor(totalMs / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((totalMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
-      let parts = [];
-      if (days > 0) parts.push(`${days}d`);
-      if (hours > 0 || days > 0) parts.push(`${hours}h`);
-      if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
-      parts.push(`${seconds}s`);
-      return parts.join(' ');
     }
     default: {
       // Default to y-m-d logic if format is unknown
