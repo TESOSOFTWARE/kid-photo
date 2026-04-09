@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
+import { trackEvent, ANALYTICS_EVENTS } from '../utils/analytics.js';
 
 const EMPTY_FORM = {
   name: '',
@@ -104,6 +105,7 @@ const TagManager = ({ onProfileChange }) => {
     persistEvents([...events, newEvent]);
     setOpenId(null);
     setFormData(EMPTY_FORM);
+    trackEvent(ANALYTICS_EVENTS.TAG_ADD, { type: newEvent.type, format: newEvent.format });
   };
 
   const handleUpdate = () => {
@@ -111,11 +113,13 @@ const TagManager = ({ onProfileChange }) => {
     persistEvents(updated);
     setOpenId(null);
     setFormData(EMPTY_FORM);
+    trackEvent(ANALYTICS_EVENTS.TAG_UPDATE, { type: formData.type, format: formData.format });
   };
 
   const deleteEvent = (id) => {
     persistEvents(events.filter(e => e.id !== id));
     if (openId === id) { setOpenId(null); setFormData(EMPTY_FORM); }
+    trackEvent(ANALYTICS_EVENTS.TAG_DELETE);
   };
 
   const startEdit = (event) => {
@@ -141,6 +145,9 @@ const TagManager = ({ onProfileChange }) => {
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'type' || field === 'format') {
+      trackEvent(ANALYTICS_EVENTS.TAG_TOGGLE_FORMAT, { field, value });
+    }
   };
 
   const renderForm = (isNew) => (

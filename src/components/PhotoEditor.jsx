@@ -4,6 +4,7 @@ import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDat
 import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
+import { trackEvent, ANALYTICS_EVENTS } from '../utils/analytics.js';
 
 const CUTE_ICONS = [
   { id: 'heart', component: Heart, color: '#ff6b6b' },
@@ -435,6 +436,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     setScales(lastState.scales);
     setRotations(lastState.rotations);
     setHistory(prev => prev.slice(0, -1));
+    trackEvent(ANALYTICS_EVENTS.PHOTO_UNDO);
   };
 
   const prevDragging = useRef(null);
@@ -492,6 +494,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       keys.forEach(k => delete style[k]);
       return { ...prev, [currentIndex]: { ...curr, style } };
     });
+    trackEvent(ANALYTICS_EVENTS.PHOTO_RESET_STYLE, { section });
   };
 
   const applyToAll = (section) => {
@@ -718,6 +721,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         }, i * 500);
       });
       confetti({ particleCount: 180, spread: 100, origin: { y: 0.6 } });
+      trackEvent(ANALYTICS_EVENTS.PHOTO_BULK_DOWNLOAD, { count: files.length });
 
     } else {
       const canvas = canvasRef.current;
@@ -737,6 +741,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         const a = document.createElement('a'); a.download = file.name; a.href = url; a.click();
         URL.revokeObjectURL(url);
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        trackEvent(ANALYTICS_EVENTS.PHOTO_DOWNLOAD, { isBulk: false });
       }, 'image/jpeg', 0.95);
     }
   };
@@ -1044,7 +1049,11 @@ const PhotoEditor = ({ kidProfiles }) => {
                       key={f} 
                       className={`font-option ${currentOverlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => { updateStyle('font', f); setIsFontPickerOpen(false); }}
+                      onClick={() => { 
+                        updateStyle('font', f); 
+                        setIsFontPickerOpen(false); 
+                        trackEvent(ANALYTICS_EVENTS.STYLE_FONT_CHANGE, { font: f });
+                      }}
                     >
                       {f}
                     </div>
@@ -1073,7 +1082,10 @@ const PhotoEditor = ({ kidProfiles }) => {
                   key={c}
                   className={`color-swatch ${currentOverlays.color === c ? 'active' : ''}`}
                   style={{ backgroundColor: c }}
-                  onClick={() => updateStyle('color', c)}
+                  onClick={() => {
+                    updateStyle('color', c);
+                    trackEvent(ANALYTICS_EVENTS.STYLE_COLOR_CHANGE, { color: c });
+                  }}
                 />
               ))}
             </div>
@@ -1199,7 +1211,11 @@ const PhotoEditor = ({ kidProfiles }) => {
 
         <div className="actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-            <button className="secondary-btn" onClick={() => {setFiles([]); setCache({}); }} style={{ flex: 1 }}>
+            <button className="secondary-btn" onClick={() => {
+              setFiles([]); 
+              setCache({}); 
+              trackEvent(ANALYTICS_EVENTS.PHOTO_CLEAR_ALL);
+            }} style={{ flex: 1 }}>
               <Trash2 size={16} /> Reset
             </button>
             <button className="primary-btn download-btn" onClick={() => downloadImage(false)} disabled={files.length === 0 || loading} style={{ flex: 2 }}>

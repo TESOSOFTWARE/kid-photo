@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Heart, User, Sliders, Image } from 'lucide-react'
 import TagManager from './components/TagManager'
 import PhotoEditor from './components/PhotoEditor'
+import { trackEvent, ANALYTICS_EVENTS } from './utils/analytics.js'
 
 function App() {
   const [kidProfiles, setKidProfiles] = useState([]);
@@ -34,13 +35,19 @@ function App() {
         <div className="mobile-tabs">
           <button
             className={`mobile-tab ${mobileTab === 'editor' ? 'active' : ''}`}
-            onClick={() => setMobileTab('editor')}
+            onClick={() => {
+              setMobileTab('editor');
+              trackEvent(ANALYTICS_EVENTS.NAV_TAB_CHANGE, { tab: 'editor' });
+            }}
           >
             <Image size={16} /> Editor
           </button>
           <button
             className={`mobile-tab ${mobileTab === 'profile' ? 'active' : ''}`}
-            onClick={() => setMobileTab('profile')}
+            onClick={() => {
+              setMobileTab('profile');
+              trackEvent(ANALYTICS_EVENTS.NAV_TAB_CHANGE, { tab: 'profile' });
+            }}
           >
             <User size={16} /> Tag
           </button>
