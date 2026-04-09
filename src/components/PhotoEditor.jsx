@@ -47,7 +47,8 @@ const PhotoEditor = ({ kidProfiles }) => {
     customPhotoDate: '',
     selectedIcons: [],
     locationDetailMode: 'city_nation',
-    hiddenNames: []
+    hiddenNames: [],
+    textEffect: 'classic'
   });
   
   const [watermarkRemoved, setWatermarkRemoved] = useState(() => localStorage.getItem('tiny-watermark-removed') === 'true');
@@ -331,8 +332,8 @@ const PhotoEditor = ({ kidProfiles }) => {
       const boxHeight = lines.length * lineHeight;
       newHitBoxes.textGroup = { x: startX, y: startY, w: maxWidth, h: boxHeight };
 
+      ctx.save();
       if (rot.textGroup !== 0) {
-        ctx.save();
         const centerX = startX + maxWidth / 2;
         const centerY = startY + boxHeight / 2;
         ctx.translate(centerX, centerY);
@@ -340,14 +341,39 @@ const PhotoEditor = ({ kidProfiles }) => {
         ctx.translate(-centerX, -centerY);
       }
 
-      lines.forEach(line => {
-        ctx.fillText(line, startX, drawY);
-        drawY += lineHeight;
+      /* ── Render Effects ── */
+      if (ov.textEffect === 'bubble') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 0;
+        const pad = fs * 0.4;
+        const r = fs * 0.5;
+        ctx.beginPath();
+        ctx.roundRect(startX - pad, startY - pad/2, maxWidth + pad*2, boxHeight + pad, r);
+        ctx.fill();
+        ctx.fillStyle = ov.color; // restore color
+        // Restore standard shadow for text on top of bubble if desired
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 10;
+      } else if (ov.textEffect === 'glow') {
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = ov.color;
+      }
+
+      lines.forEach((line, i) => {
+        const lx = startX;
+        const ly = startY + (i * lineHeight);
+        
+        if (ov.textEffect === 'outline') {
+          ctx.strokeStyle = ov.color === '#ffffff' ? '#000000' : '#ffffff';
+          ctx.lineWidth = fs * 0.15;
+          ctx.lineJoin = 'round';
+          ctx.strokeText(line, lx, ly);
+        }
+        
+        ctx.fillText(line, lx, ly);
       });
 
-      if (rot.textGroup !== 0) {
-        ctx.restore();
-      }
+      ctx.restore();
     }
 
     /* ── 2. Render Icons (freely draggable) ── */
@@ -457,6 +483,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     customPhotoDate: ['customPhotoDate'],
     locationDetailMode: ['locationDetailMode'],
     selectedIcons: ['selectedIcons'],
+    textEffect: ['textEffect']
   };
   const isDefaultSection = (section) => {
     const keys = SECTIONS[section] || [];
@@ -791,37 +818,10 @@ const PhotoEditor = ({ kidProfiles }) => {
         )}
         
         {files.length === 0 ? (
-          <div className="welcome-hero">
-            <span className="hero-tagline">✨ Milestone & Age Tracker for Parents</span>
-            <h1>Preserve Every Tiny Moment</h1>
-            <p className="subtitle">Automatically calculate ages, track milestones, and add beautiful countdowns to your photos. The perfect batch editor for parenting memories.</p>
-
-            <div className="hero-steps">
-               <div className="step-card">
-                  <div className="step-icon"><Sparkles size={24} /></div>
-                  <h3>1. Create Tags</h3>
-                  <p>Add your child's birth date or special events like "First Steps" in the sidebar.</p>
-               </div>
-               <div className="step-card">
-                  <div className="step-icon"><Camera size={24} /></div>
-                  <h3>2. Select Photos</h3>
-                  <p>Upload your favorite snaps from any device. We support high-quality batch editing.</p>
-               </div>
-               <div className="step-card">
-                  <div className="step-icon"><Check size={24} /></div>
-                  <h3>3. Save & Share</h3>
-                  <p>Customize labels, move stickers, and save your memories instantly.</p>
-               </div>
-            </div>
-
-            <div className="hero-cta-group">
-               <label className="primary-btn hero-upload-btn" htmlFor="file-input">
-                  <Download size={22} /> Select Photos to Start
-               </label>
-               <div className="privacy-notice">
-                  <Sparkles size={14} /> 100% Private: Your photos never leave your device.
-               </div>
-            </div>
+          <div className="upload-placeholder" onClick={() => document.getElementById('file-input').click()}>
+            <Camera size={48} />
+            <p>Select Photos to Start</p>
+            <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Supports JPG, PNG, HEIC</span>
           </div>
         ) : (
           <>
@@ -1088,6 +1088,29 @@ const PhotoEditor = ({ kidProfiles }) => {
                   }}
                 />
               ))}
+            </div>
+          </div>
+
+          <div className="control-item">
+            <label>Text Effect</label>
+            <DefaultToggle section="textEffect" />
+            <div className="overlay-toggle-row">
+              <button 
+                className={`overlay-toggle ${currentOverlays.textEffect === 'classic' ? 'active' : ''}`}
+                onClick={() => updateStyle('textEffect', 'classic')}
+              >Classic</button>
+              <button 
+                className={`overlay-toggle ${currentOverlays.textEffect === 'outline' ? 'active' : ''}`}
+                onClick={() => updateStyle('textEffect', 'outline')}
+              >Outline</button>
+              <button 
+                className={`overlay-toggle ${currentOverlays.textEffect === 'bubble' ? 'active' : ''}`}
+                onClick={() => updateStyle('textEffect', 'bubble')}
+              >Bubble</button>
+              <button 
+                className={`overlay-toggle ${currentOverlays.textEffect === 'glow' ? 'active' : ''}`}
+                onClick={() => updateStyle('textEffect', 'glow')}
+              >Glow</button>
             </div>
           </div>
 
