@@ -545,7 +545,10 @@ const PhotoEditor = ({ kidProfiles }) => {
     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
       <button
         className="secondary-btn"
-        onClick={() => resetToDefault(section)}
+        onClick={() => {
+          resetToDefault(section);
+          trackEvent(ANALYTICS_EVENTS.STYLE_RESET_SECTION, { section });
+        }}
         disabled={isDefaultSection(section)}
         style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', opacity: isDefaultSection(section) ? 0.5 : 1 }}
       >
@@ -556,6 +559,7 @@ const PhotoEditor = ({ kidProfiles }) => {
         onClick={() => {
           if (window.confirm("This will apply the current photo's settings for this section to ALL photos. Continue?")) {
             applyToAll(section);
+            trackEvent(ANALYTICS_EVENTS.STYLE_APPLY_ALL, { section });
           }
         }}
         style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
@@ -819,7 +823,11 @@ const PhotoEditor = ({ kidProfiles }) => {
             </div>
 
             <div className="hero-cta-group">
-               <label className="primary-btn hero-upload-btn" htmlFor="file-input">
+               <label 
+                  className="primary-btn hero-upload-btn" 
+                  htmlFor="file-input"
+                  onClick={() => trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB, { context: 'hero' })}
+                >
                   <Download size={22} /> Select Photos to Start
                </label>
                <div className="privacy-notice">
@@ -863,11 +871,17 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </button>
               )}
               <div className="pill-pager">
-                <button onClick={() => setCurrentIndex(prev => (prev > 0 ? prev - 1 : files.length - 1))}>
+                <button onClick={() => {
+                  setCurrentIndex(prev => (prev > 0 ? prev - 1 : files.length - 1));
+                  trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_PREV);
+                }}>
                   <ChevronLeft size={18} />
                 </button>
                 <span>{currentIndex + 1} / {files.length}</span>
-                <button onClick={() => setCurrentIndex(prev => (prev < files.length - 1 ? prev + 1 : 0))}>
+                <button onClick={() => {
+                  setCurrentIndex(prev => (prev < files.length - 1 ? prev + 1 : 0));
+                  trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_NEXT);
+                }}>
                   <ChevronRight size={18} />
                 </button>
               </div>
@@ -878,6 +892,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 onClick={() => {
                   if (window.confirm("Remove this photo?")) {
                     removePhoto(currentIndex);
+                    trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO);
                   }
                 }} 
                 className="pill-remove-btn" 
@@ -901,7 +916,10 @@ const PhotoEditor = ({ kidProfiles }) => {
                     <div
                       key={idx}
                       className={`thumbnail-item ${currentIndex === idx ? 'active' : ''}`}
-                      onClick={() => setCurrentIndex(idx)}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB);
+                      }}
                     >
                       {thumbUrls[idx] ? (
                         <img src={thumbUrls[idx]} alt={`thumb-${idx}`} />
@@ -911,7 +929,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                       {currentIndex === idx && (
                         <button
                           className="thumb-remove-btn"
-                          onClick={e => { e.stopPropagation(); removePhoto(idx); }}
+                          onClick={e => { e.stopPropagation(); removePhoto(idx); trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO); }}
                           title="Remove this photo"
                         >✕</button>
                       )}
@@ -931,6 +949,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 if (watermarkRemoved) return;
                 setIsWatchingAd(true);
                 setAdCountdown(10);
+                trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVE_START);
               }} 
               className={`watermark-removal-btn ${watermarkRemoved ? 'active' : ''}`}
               disabled={watermarkRemoved}
@@ -986,7 +1005,7 @@ const PhotoEditor = ({ kidProfiles }) => {
               <span style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', fontWeight: 600 }}>✦ Custom overrides active</span>
             )}
           </div>
-          <button onClick={handleUndo} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button>
+          <button onClick={() => { handleUndo(); trackEvent(ANALYTICS_EVENTS.UNDO_CLICK); }} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button>
         </div>
 
         <div className="toolbar-section">
@@ -996,15 +1015,24 @@ const PhotoEditor = ({ kidProfiles }) => {
             <div className="overlay-toggle-row">
               <button 
                 className={`overlay-toggle ${currentOverlays.showName ? 'active' : ''}`}
-                onClick={() => updateStyle('showName', !currentOverlays.showName)}
+                onClick={() => {
+                  updateStyle('showName', !currentOverlays.showName);
+                  trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'showName', value: !currentOverlays.showName });
+                }}
               >🏷️ Tags</button>
               <button 
                 className={`overlay-toggle ${currentOverlays.showDate ? 'active' : ''}`}
-                onClick={() => updateStyle('showDate', !currentOverlays.showDate)}
+                onClick={() => {
+                  updateStyle('showDate', !currentOverlays.showDate);
+                  trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'showDate', value: !currentOverlays.showDate });
+                }}
               >📅 Date</button>
               <button 
                 className={`overlay-toggle ${currentOverlays.showLocation ? 'active' : ''}`}
-                onClick={() => updateStyle('showLocation', !currentOverlays.showLocation)}
+                onClick={() => {
+                  updateStyle('showLocation', !currentOverlays.showLocation);
+                  trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'showLocation', value: !currentOverlays.showLocation });
+                }}
               >📍 Place</button>
             </div>
 
@@ -1023,6 +1051,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                           ? [...currentOverlays.hiddenNames, index]
                           : currentOverlays.hiddenNames.filter(idx => idx !== index);
                         updateStyle('hiddenNames', hidden);
+                        trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'hiddenNames', value: hidden });
                       }}
                       style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
                     >
@@ -1042,7 +1071,10 @@ const PhotoEditor = ({ kidProfiles }) => {
             <div className="custom-select-container" ref={fontPickerRef}>
               <button 
                 className="font-select-trigger" 
-                onClick={() => setIsFontPickerOpen(!isFontPickerOpen)}
+                onClick={() => {
+                  setIsFontPickerOpen(!isFontPickerOpen);
+                  trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'font_picker', value: !isFontPickerOpen });
+                }}
                 style={{ fontFamily: currentOverlays.font }}
               >
                 {currentOverlays.font} <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>▾</span>
@@ -1054,7 +1086,11 @@ const PhotoEditor = ({ kidProfiles }) => {
                       key={f} 
                       className={`font-option ${currentOverlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => { updateStyle('font', f); setIsFontPickerOpen(false); }}
+                      onClick={() => { 
+                        updateStyle('font', f); 
+                        setIsFontPickerOpen(false); 
+                        trackEvent(ANALYTICS_EVENTS.FONT_CHANGE, { font: f });
+                      }}
                     >
                       {f}
                     </div>
@@ -1083,7 +1119,10 @@ const PhotoEditor = ({ kidProfiles }) => {
                   key={c}
                   className={`color-swatch ${currentOverlays.color === c ? 'active' : ''}`}
                   style={{ backgroundColor: c }}
-                  onClick={() => updateStyle('color', c)}
+                  onClick={() => {
+                    updateStyle('color', c);
+                    trackEvent(ANALYTICS_EVENTS.COLOR_CHANGE, { color: c });
+                  }}
                 />
               ))}
             </div>
@@ -1187,6 +1226,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                         onClick={() => {
                           saveHistory();
                           updateStyle('selectedIcons', currentOverlays.selectedIcons.filter(x => x.id !== s.id));
+                          trackEvent(ANALYTICS_EVENTS.STICKER_REMOVE, { tag_id: s.id });
                         }} 
                         className="overlay-toggle active" 
                         style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -1198,7 +1238,11 @@ const PhotoEditor = ({ kidProfiles }) => {
                 </div>
                 <button 
                   className="secondary-btn" 
-                  onClick={() => { saveHistory(); updateStyle('selectedIcons', []); }}
+                  onClick={() => { 
+                    saveHistory(); 
+                    updateStyle('selectedIcons', []); 
+                    trackEvent(ANALYTICS_EVENTS.STICKER_CLEAR);
+                  }}
                   style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.82rem', padding: '0.4rem' }}
                 >
                   <Trash2 size={12}/> Clear All
@@ -1210,7 +1254,11 @@ const PhotoEditor = ({ kidProfiles }) => {
 
         <div className="actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-            <button className="secondary-btn" onClick={() => {setFiles([]); setCache({}); }} style={{ flex: 1 }}>
+            <button className="secondary-btn" onClick={() => {
+              setFiles([]); 
+              setCache({}); 
+              trackEvent(ANALYTICS_EVENTS.RESET_ALL);
+            }} style={{ flex: 1 }}>
               <Trash2 size={16} /> Reset
             </button>
             <button className="primary-btn download-btn" onClick={() => downloadImage(false)} disabled={files.length === 0 || loading} style={{ flex: 2 }}>

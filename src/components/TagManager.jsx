@@ -105,6 +105,7 @@ const TagManager = ({ onProfileChange }) => {
     persistEvents([...events, newEvent]);
     setOpenId(null);
     setFormData(EMPTY_FORM);
+    trackEvent(ANALYTICS_EVENTS.ADD_TAG_SAVE, { type: formData.type });
   };
 
   const handleUpdate = () => {
@@ -112,11 +113,13 @@ const TagManager = ({ onProfileChange }) => {
     persistEvents(updated);
     setOpenId(null);
     setFormData(EMPTY_FORM);
+    trackEvent(ANALYTICS_EVENTS.EDIT_TAG_UPDATE, { type: formData.type });
   };
 
   const deleteEvent = (id) => {
     persistEvents(events.filter(e => e.id !== id));
     if (openId === id) { setOpenId(null); setFormData(EMPTY_FORM); }
+    trackEvent(ANALYTICS_EVENTS.DELETE_TAG);
   };
 
   const startEdit = (event) => {
@@ -126,18 +129,21 @@ const TagManager = ({ onProfileChange }) => {
     } else {
       setFormData(event);
       setOpenId(event.id);
+      trackEvent(ANALYTICS_EVENTS.EDIT_TAG_START);
     }
   };
 
   const openNewForm = () => {
     setOpenId('new');
     setFormData(EMPTY_FORM);
+    trackEvent(ANALYTICS_EVENTS.ADD_TAG_START);
   };
 
   const closeForm = () => {
     setOpenId(null);
     setFormData(EMPTY_FORM);
     onProfileChange(events); // revert live preview
+    trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'tag_form', value: 'close' });
   };
 
   const updateField = (field, value) => {
@@ -167,9 +173,15 @@ const TagManager = ({ onProfileChange }) => {
         <label>Type</label>
         <div className="type-toggle">
           <button className={formData.type === 'countup' ? 'active' : ''}
-            onClick={() => updateField('type', 'countup')}>Count Up</button>
+            onClick={() => {
+              updateField('type', 'countup');
+              trackEvent(ANALYTICS_EVENTS.TAG_TYPE_TOGGLE, { type: 'countup' });
+            }}>Count Up</button>
           <button className={formData.type === 'countdown' ? 'active' : ''}
-            onClick={() => updateField('type', 'countdown')}>Count Down</button>
+            onClick={() => {
+              updateField('type', 'countdown');
+              trackEvent(ANALYTICS_EVENTS.TAG_TYPE_TOGGLE, { type: 'countdown' });
+            }}>Count Down</button>
         </div>
       </div>
 
@@ -203,9 +215,15 @@ const TagManager = ({ onProfileChange }) => {
           {formData.isRecurring && (
             <div className="type-toggle" style={{ marginTop: '0.4rem' }}>
               <button className={formData.frequency === 'monthly' ? 'active' : ''}
-                onClick={() => updateField('frequency', 'monthly')}>Monthly</button>
+                onClick={() => {
+                  updateField('frequency', 'monthly');
+                  trackEvent(ANALYTICS_EVENTS.TAG_FREQ_TOGGLE, { freq: 'monthly' });
+                }}>Monthly</button>
               <button className={formData.frequency === 'yearly' ? 'active' : ''}
-                onClick={() => updateField('frequency', 'yearly')}>Yearly</button>
+                onClick={() => {
+                  updateField('frequency', 'yearly');
+                  trackEvent(ANALYTICS_EVENTS.TAG_FREQ_TOGGLE, { freq: 'yearly' });
+                }}>Yearly</button>
             </div>
           )}
         </div>
@@ -218,7 +236,10 @@ const TagManager = ({ onProfileChange }) => {
             <button
               key={opt.value}
               className={formData.format === opt.value ? 'active' : ''}
-              onClick={() => updateField('format', opt.value)}
+              onClick={() => {
+                updateField('format', opt.value);
+                trackEvent(ANALYTICS_EVENTS.TAG_FORMAT_CHANGE, { format: opt.value });
+              }}
               style={{ flex: 'unset', fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
             >{opt.label}</button>
           ))}

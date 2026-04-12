@@ -1307,11 +1307,15 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 .hero-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 3.5rem;
   text-align: center;
   position: relative;
+  width: 100%;
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Horizontal Connector Line for Desktop */
@@ -1407,9 +1411,20 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   opacity: 0.8;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .hero-steps {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    max-width: 600px;
+  }
+}
+
+@media (max-width: 900px) {
+  .welcome-hero {
+    padding: 2.5rem 1.5rem;
+    width: 95%;
+  }
+  .welcome-hero h1 {
+    font-size: 2rem;
   }
   .main-content, .editor-main {
     overflow-y: auto !important;
@@ -1418,10 +1433,31 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 @media (max-width: 600px) {
   .welcome-hero {
-    padding: 2rem 1rem;
-    border-radius: 1.5rem;
+    padding: 1.5rem 1rem;
+    border-radius: 2rem;
+    margin: 1rem auto;
   }
   .welcome-hero h1 {
-    font-size: 1.75rem;
+    font-size: 1.6rem;
+  }
+  .hero-tagline {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.8rem;
+  }
+  .step-card {
+    padding: 1.5rem 1rem;
+  }
+  .step-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 1rem;
+  }
+  .step-card h3 {
+    font-size: 1.1rem;
+  }
+  .hero-upload-btn {
+    width: 100%;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
   }
 }
