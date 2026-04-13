@@ -31,7 +31,7 @@ const PhotoEditor = ({ kidProfiles }) => {
   const LOAD_LIMIT = 30;
   const [cache, setCache] = useState({}); // { [index]: { image, metadata } }
   const [thumbUrls, setThumbUrls] = useState({}); // { [index]: dataURL } persistent per-photo thumbnail
-  
+
   const [loading, setLoading] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
 
@@ -49,7 +49,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     locationDetailMode: 'city_nation',
     hiddenNames: []
   });
-  
+
   const [watermarkRemoved, setWatermarkRemoved] = useState(() => localStorage.getItem('tiny-watermark-removed') === 'true');
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adCountdown, setAdCountdown] = useState(0);
@@ -74,7 +74,7 @@ const PhotoEditor = ({ kidProfiles }) => {
   });
 
   const [photoOverrides, setPhotoOverrides] = useState({}); // { [idx]: { positions, scales, rotations, fontSize, customLocation, style: {} } }
-  
+
   const [history, setHistory] = useState([]);
 
   const [dragging, setDragging] = useState(null);
@@ -102,7 +102,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       [building, district, city, country].forEach(p => p && parts.push(p));
     } else if (mode === 'district_city') {
       [district, city, country].forEach(p => p && parts.push(p));
-    } else { 
+    } else {
       [city, country].forEach(p => p && parts.push(p));
     }
     return [...new Set(parts)].join(', ');
@@ -110,7 +110,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const processFile = async (file, index) => {
     if (cache[index]) return cache[index];
-    
+
     let processedData = { image: null, metadata: null };
     try {
       const metadata = await extractMetadata(file);
@@ -183,7 +183,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       selected = selected.slice(0, LOAD_LIMIT - files.length);
     }
     const oldLength = files.length;
-    
+
     // Immediate thumbnails for JPEGs/PNGs
     const newThumbs = {};
     selected.forEach((f, i) => {
@@ -241,7 +241,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const renderToCanvas = (ctx, canvasWidth, canvasHeight, img, meta, pos, scl, rot, fsz, customLoc, ov) => {
     ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-    
+
     const ratio = Math.min(2000 / img.width, 1);
     const baseFontSize = fsz * ratio;
     const stickerBaseSize = 40 * ratio;
@@ -268,11 +268,11 @@ const PhotoEditor = ({ kidProfiles }) => {
           // New TinyTag event format
           if (evt.type === 'countdown' || evt.type === 'countup') {
             let targetDate = parseLocalDateTime(evt.date, evt.time);
-            
+
             // The user wants calculation to be relative to the photo's date/time by default
             // Unless no photoDate is available (then fallback to today)
             const referenceDate = photoDate ? new Date(photoDate) : new Date();
-            
+
             if (evt.type === 'countdown' && evt.isRecurring) {
               targetDate = getNextRecurringDate(evt.date, evt.frequency);
               if (evt.time) {
@@ -280,7 +280,7 @@ const PhotoEditor = ({ kidProfiles }) => {
                 targetDate.setHours(h, m, 0, 0);
               }
             }
-            
+
             const diff = calculateDiff(targetDate, referenceDate, evt.format || 'y-m-d');
             const prefix = evt.prefix ? `${evt.prefix} ` : '';
             const suffix = evt.label ? ` ${evt.label}` : '';
@@ -307,7 +307,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     if (ov.showDate && photoDate) {
       if (ov.font === 'VT323') {
         const d = new Date(photoDate);
-        lines.push(`🗓️ ${d.getFullYear()}'${(d.getMonth()+1).toString().padStart(2,'0')}'${d.getDate().toString().padStart(2,'0')}`);
+        lines.push(`🗓️ ${d.getFullYear()}'${(d.getMonth() + 1).toString().padStart(2, '0')}'${d.getDate().toString().padStart(2, '0')}`);
       } else {
         lines.push(`📅 ${formatDate(photoDate)}`);
       }
@@ -324,7 +324,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       ctx.font = `${fs}px ${ov.font}`;
       const startX = pos.textGroup.x * canvasWidth;
       const startY = pos.textGroup.y * canvasHeight;
-      
+
       let drawY = startY;
       let maxWidth = 0;
       const lineHeight = fs * 1.3;
@@ -355,7 +355,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     /* ── 2. Render Icons (freely draggable) ── */
     ctx.textBaseline = 'middle';
-    const iconMap = { 
+    const iconMap = {
       heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️',
       moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸',
       umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊'
@@ -373,16 +373,16 @@ const PhotoEditor = ({ kidProfiles }) => {
       const y = p.y * canvasHeight;
       const metrics = ctx.measureText(iconText);
       newHitBoxes[iconId] = { x, y: y - fs / 2, w: metrics.width, h: fs };
-      
+
       if (rot[iconId] !== undefined && rot[iconId] !== 0) {
         ctx.save();
         ctx.translate(x + metrics.width / 2, y);
         ctx.rotate(rot[iconId] * Math.PI / 180);
         ctx.translate(-(x + metrics.width / 2), -y);
       }
-      
+
       ctx.fillText(iconText, x, y);
-      
+
       if (rot[iconId] !== undefined && rot[iconId] !== 0) ctx.restore();
     });
 
@@ -394,7 +394,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       ctx.font = `700 ${wmSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
-      
+
       // Draw subtle shadow for readability on any background
       ctx.shadowColor = 'rgba(0,0,0,0.6)';
       ctx.shadowBlur = 8;
@@ -464,7 +464,7 @@ const PhotoEditor = ({ kidProfiles }) => {
   const isDefaultSection = (section) => {
     const keys = SECTIONS[section] || [];
     const override = photoOverrides[currentIndex] || {};
-    
+
     // Check main override fields (rotations, positions, etc)
     if (section === 'rotations' || section === 'positions' || section === 'scales') {
       const fieldData = override[section];
@@ -481,7 +481,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     const keys = SECTIONS[section] || [];
     setPhotoOverrides(prev => {
       const curr = { ...(prev[currentIndex] || {}) };
-      
+
       if (section === 'rotations' || section === 'positions' || section === 'scales') {
         const next = { ...curr };
         delete next[section];
@@ -504,7 +504,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       const currentRot = photoOverrides[currentIndex]?.rotations || {};
       // Update global rotation state
       setRotations(prev => ({ ...prev, ...currentRot }));
-      
+
       // Erase per-photo rotation overrides
       setPhotoOverrides(prev => {
         const next = { ...prev };
@@ -518,7 +518,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     const keys = SECTIONS[section] || [];
     const currentStyle = photoOverrides[currentIndex]?.style || {};
-    
+
     // First, map the current styles to the global default overlays
     const updates = {};
     keys.forEach(k => {
@@ -626,11 +626,11 @@ const PhotoEditor = ({ kidProfiles }) => {
       touchState.current.startX = t.clientX;
       touchState.current.startY = t.clientY;
       touchState.current.isSwiping = false; // reset swiping state
-      
-      if (key) { 
-        setDragging(key); 
-        draggingRef.current = key; 
-        touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; 
+
+      if (key) {
+        setDragging(key);
+        draggingRef.current = key;
+        touchState.current = { ...touchState.current, initialDist: null, initialScale: null };
       } else {
         setDragging(null);
         draggingRef.current = null;
@@ -643,23 +643,23 @@ const PhotoEditor = ({ kidProfiles }) => {
     const key = draggingRef.current;
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    
+
     if (e.touches.length === 1 && !touchState.current.initialDist) {
       const touch = e.touches[0];
       const moveX = touch.clientX - touchState.current.startX;
       const moveY = touch.clientY - touchState.current.startY;
-      
+
       // Swipe detection (only if not currently dragging a sticker)
       if (!key && !touchState.current.isSwiping) {
-         if (Math.abs(moveX) > Math.abs(moveY) && Math.abs(moveX) > 40) {
-            if (moveX > 0 && currentIndex > 0) {
-              setCurrentIndex(prev => prev - 1);
-              touchState.current.isSwiping = true;
-            } else if (moveX < 0 && currentIndex < files.length - 1) {
-              setCurrentIndex(prev => prev + 1);
-              touchState.current.isSwiping = true;
-            }
-         }
+        if (Math.abs(moveX) > Math.abs(moveY) && Math.abs(moveX) > 40) {
+          if (moveX > 0 && currentIndex > 0) {
+            setCurrentIndex(prev => prev - 1);
+            touchState.current.isSwiping = true;
+          } else if (moveX < 0 && currentIndex < files.length - 1) {
+            setCurrentIndex(prev => prev + 1);
+            touchState.current.isSwiping = true;
+          }
+        }
       }
 
       if (key) {
@@ -677,7 +677,7 @@ const PhotoEditor = ({ kidProfiles }) => {
     }
   };
 
-  const getFileName = (meta, idx) => `TinyTag_${kidProfiles[0]?.name || 'Memory'}_${idx+1}.jpg`;
+  const getFileName = (meta, idx) => `TinyTag_${kidProfiles[0]?.name || 'Memory'}_${idx + 1}.jpg`;
 
   const downloadImage = async (saveAllFlag = false) => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -691,7 +691,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       for (let i = 0; i < files.length; i++) {
         const data = await processFile(files[i], i);
         if (!data.image) continue;
-        
+
         const ratio = Math.min(2000 / data.image.width, 1);
         tempCanvas.width = data.image.width * ratio;
         tempCanvas.height = data.image.height * ratio;
@@ -702,11 +702,11 @@ const PhotoEditor = ({ kidProfiles }) => {
         const loc = photoOverrides[i]?.customLocation;
         const ov = { ...overlays, ...(photoOverrides[i]?.style || {}) };
         renderToCanvas(tctx, tempCanvas.width, tempCanvas.height, data.image, data.metadata, pos, scl, rot, fsz, loc, ov);
-        
+
         const blob = await new Promise(r => tempCanvas.toBlob(r, 'image/jpeg', 0.95));
         generatedFiles.push(new File([blob], getFileName(data.metadata, i), { type: 'image/jpeg' }));
       }
-      
+
       setSavingAll(false);
 
       if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
@@ -716,12 +716,12 @@ const PhotoEditor = ({ kidProfiles }) => {
           return;
         } catch (e) { if (e.name !== 'AbortError') console.error(e); }
       }
-      
+
       // Desktop manual download loop
       generatedFiles.forEach((file, i) => {
         setTimeout(() => {
           const url = URL.createObjectURL(file);
-          const a = document.createElement('a'); 
+          const a = document.createElement('a');
           a.download = file.name; a.href = url; a.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         }, i * 500);
@@ -734,7 +734,7 @@ const PhotoEditor = ({ kidProfiles }) => {
       if (!canvas) return;
       canvas.toBlob(async (blob) => {
         const file = new File([blob], getFileName(metadata, currentIndex), { type: 'image/jpeg' });
-        
+
         if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({ files: [file], title: 'TinyTag Memory 📸' });
@@ -743,9 +743,9 @@ const PhotoEditor = ({ kidProfiles }) => {
             return;
           } catch (e) { if (e.name === 'AbortError') return; }
         }
-        
+
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');        a.download = file.name; a.href = url; a.click();
+        const a = document.createElement('a'); a.download = file.name; a.href = url; a.click();
         URL.revokeObjectURL(url);
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
         trackEvent(ANALYTICS_EVENTS.SAVE_PHOTO);
@@ -755,7 +755,7 @@ const PhotoEditor = ({ kidProfiles }) => {
 
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
   const fontPickerRef = useRef(null);
-  
+
   // Handlers for font picker and ad countdown
   useEffect(() => {
     const c = (e) => { if (fontPickerRef.current && !fontPickerRef.current.contains(e.target)) setIsFontPickerOpen(false); };
@@ -797,74 +797,84 @@ const PhotoEditor = ({ kidProfiles }) => {
             <p>{savingAll ? `Saving ${files.length} photos...` : 'Magic in progress...'}</p>
           </div>
         )}
-        
+
         {files.length === 0 ? (
           <div className="welcome-hero">
             <span className="hero-tagline">✨ Milestone & Age Tracker for Parents</span>
             <h1>Preserve Every Tiny Moment</h1>
-            <p className="subtitle">Automatically calculate ages, track milestones, and add beautiful countdowns to your photos. The perfect batch editor for parenting memories.</p>
+            <p className="subtitle">Automatically add date, location, and text to photos. Batch edit multiple images at once. Track milestones, ages, and countdowns — perfect for parenting memories and everyday moments</p>
 
             <div className="hero-steps">
-               <div className="step-card">
-                  <div className="step-icon"><Sparkles size={24} /></div>
-                  <h3>1. Create Tags</h3>
-                  <p>Add your child's birth date or special events like "First Steps" in the sidebar.</p>
-               </div>
-               <div className="step-card">
-                  <div className="step-icon"><Camera size={24} /></div>
-                  <h3>2. Select Photos</h3>
-                  <p>Upload your favorite snaps from any device. We support high-quality batch editing.</p>
-               </div>
-               <div className="step-card">
-                  <div className="step-icon"><Check size={24} /></div>
-                  <h3>3. Save & Share</h3>
-                  <p>Customize labels, move stickers, and save your memories instantly.</p>
-               </div>
+              <div className="step-card">
+                <div className="step-icon"><Sparkles size={24} /></div>
+                <h3>1. Create Milestones</h3>
+                <p>Add birth dates, relationship anniversaries, or wedding dates in the sidebar.</p>
+              </div>
+              <div className="step-card">
+                <div className="step-icon"><Camera size={24} /></div>
+                <h3>2. Select Photos</h3>
+                <p>Upload your favorite snaps. Auto-calculate years, months, and days since your start date.</p>
+              </div>
+              <div className="step-card">
+                <div className="step-icon"><Check size={24} /></div>
+                <h3>3. Beautiful Outfits</h3>
+                <p>Overlay growth milestones or count down to big events with gorgeous, private tags.</p>
+              </div>
+            </div>
+
+            <div className="usage-ideas" style={{ margin: '0 0 2rem', width: '100%', textAlign: 'center' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                <span style={{ padding: '0.35rem 0.75rem', background: '#f1f3f5', borderRadius: '2rem', color: '#495057' }}>👶 Baby Age</span>
+                <span style={{ padding: '0.35rem 0.75rem', background: '#f1f3f5', borderRadius: '2rem', color: '#495057' }}>💑 Anniversaries</span>
+                <span style={{ padding: '0.35rem 0.75rem', background: '#f1f3f5', borderRadius: '2rem', color: '#495057' }}>🤰 Pregnancy Tracker</span>
+                <span style={{ padding: '0.35rem 0.75rem', background: '#f1f3f5', borderRadius: '2rem', color: '#495057' }}>🎂 Countdowns</span>
+                <span style={{ padding: '0.35rem 0.75rem', background: '#f1f3f5', borderRadius: '2rem', color: '#495057' }}>🚀 Project Goals</span>
+              </div>
             </div>
 
             <div className="hero-cta-group">
-               <label 
-                  className="primary-btn hero-upload-btn" 
-                  htmlFor="file-input"
-                  onClick={() => trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB, { context: 'hero' })}
-                >
-                  <Download size={22} /> Select Photos to Start
-               </label>
-               <div className="privacy-notice">
-                  <Sparkles size={14} /> 100% Private: Your photos never leave your device.
-               </div>
+              <label
+                className="primary-btn hero-upload-btn"
+                htmlFor="file-input"
+                onClick={() => trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB, { context: 'hero' })}
+              >
+                <Download size={22} /> Select Photos to Start
+              </label>
+              <div className="privacy-notice">
+                <Sparkles size={14} /> 100% Private: Your photos never leave your device.
+              </div>
             </div>
           </div>
         ) : (
           <>
-            <div 
-            className="editor-canvas-container"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={() => { 
-              setDragging(null); 
-              draggingRef.current = null; 
-              touchState.current = { ...touchState.current, initialDist: null, initialScale: null }; 
-            }}
-          >
-            <canvas 
-              ref={canvasRef} 
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={() => { setDragging(null); draggingRef.current = null; }}
-              onMouseLeave={() => { setDragging(null); draggingRef.current = null; }}
-              style={{ touchAction: 'none' }}
-            />
-          </div>
+            <div
+              className="editor-canvas-container"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={() => {
+                setDragging(null);
+                draggingRef.current = null;
+                touchState.current = { ...touchState.current, initialDist: null, initialScale: null };
+              }}
+            >
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={() => { setDragging(null); draggingRef.current = null; }}
+                onMouseLeave={() => { setDragging(null); draggingRef.current = null; }}
+                style={{ touchAction: 'none' }}
+              />
+            </div>
 
             <div className="mobile-pill-nav">
               {!watermarkRemoved && (
-                <button 
+                <button
                   onClick={() => {
                     setIsWatchingAd(true);
                     setAdCountdown(10);
                     trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVE_START);
-                  }} 
+                  }}
                   className="pill-watermark-btn"
                 >
                   ✨ No Watermark
@@ -888,14 +898,14 @@ const PhotoEditor = ({ kidProfiles }) => {
               <label htmlFor="change-file-input" className="pill-add-btn" title="Add photo">
                 <Plus size={18} />
               </label>
-              <button 
+              <button
                 onClick={() => {
                   if (window.confirm("Remove this photo?")) {
                     removePhoto(currentIndex);
                     trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO);
                   }
-                }} 
-                className="pill-remove-btn" 
+                }}
+                className="pill-remove-btn"
                 title="Remove photo"
               >
                 <Trash2 size={18} />
@@ -903,63 +913,63 @@ const PhotoEditor = ({ kidProfiles }) => {
             </div>
 
             <div className="thumbnail-controls-row desktop-only">
-            {files.length > 0 && (
-              <div className="photo-info-badge">
-                {currentIndex + 1} / {files.length}
-              </div>
-            )}
-
-            {files.length >= 1 && (
-              <div className="thumbnail-slider-container">
-                <div className="thumbnail-slider">
-                  {files.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className={`thumbnail-item ${currentIndex === idx ? 'active' : ''}`}
-                      onClick={() => {
-                        setCurrentIndex(idx);
-                        trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB);
-                      }}
-                    >
-                      {thumbUrls[idx] ? (
-                        <img src={thumbUrls[idx]} alt={`thumb-${idx}`} />
-                      ) : (
-                        <div className="thumbnail-placeholder">{idx + 1}</div>
-                      )}
-                      {currentIndex === idx && (
-                        <button
-                          className="thumb-remove-btn"
-                          onClick={e => { e.stopPropagation(); removePhoto(idx); trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO); }}
-                          title="Remove this photo"
-                        >✕</button>
-                      )}
-                    </div>
-                  ))}
+              {files.length > 0 && (
+                <div className="photo-info-badge">
+                  {currentIndex + 1} / {files.length}
                 </div>
-              </div>
-            )}
-            <label htmlFor="change-file-input" className="change-photo-btn" title="Add photo">
-              <Plus size={18} />
-            </label>
-          </div>
+              )}
 
-          <div className="desktop-only" style={{ marginTop: '0.6rem', padding: '0 0.5rem' }}>
-            <button 
-              onClick={() => {
-                if (watermarkRemoved) return;
-                setIsWatchingAd(true);
-                setAdCountdown(10);
-                trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVE_START);
-              }} 
-              className={`watermark-removal-btn ${watermarkRemoved ? 'active' : ''}`}
-              disabled={watermarkRemoved}
-            >
-              {watermarkRemoved ? '💎 Watermark Removed' : '🔓 Watch Ad to Remove Watermark'}
-            </button>
-          </div>
+              {files.length >= 1 && (
+                <div className="thumbnail-slider-container">
+                  <div className="thumbnail-slider">
+                    {files.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className={`thumbnail-item ${currentIndex === idx ? 'active' : ''}`}
+                        onClick={() => {
+                          setCurrentIndex(idx);
+                          trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB);
+                        }}
+                      >
+                        {thumbUrls[idx] ? (
+                          <img src={thumbUrls[idx]} alt={`thumb-${idx}`} />
+                        ) : (
+                          <div className="thumbnail-placeholder">{idx + 1}</div>
+                        )}
+                        {currentIndex === idx && (
+                          <button
+                            className="thumb-remove-btn"
+                            onClick={e => { e.stopPropagation(); removePhoto(idx); trackEvent(ANALYTICS_EVENTS.REMOVE_PHOTO); }}
+                            title="Remove this photo"
+                          >✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <label htmlFor="change-file-input" className="change-photo-btn" title="Add photo">
+                <Plus size={18} />
+              </label>
+            </div>
+
+            <div className="desktop-only" style={{ marginTop: '0.6rem', padding: '0 0.5rem' }}>
+              <button
+                onClick={() => {
+                  if (watermarkRemoved) return;
+                  setIsWatchingAd(true);
+                  setAdCountdown(10);
+                  trackEvent(ANALYTICS_EVENTS.WATERMARK_REMOVE_START);
+                }}
+                className={`watermark-removal-btn ${watermarkRemoved ? 'active' : ''}`}
+                disabled={watermarkRemoved}
+              >
+                {watermarkRemoved ? '💎 Watermark Removed' : '🔓 Watch Ad to Remove Watermark'}
+              </button>
+            </div>
           </>
         )}
-        
+
         {isWatchingAd && (
           <div className="ad-overlay">
             <div className="ad-content">
@@ -969,13 +979,13 @@ const PhotoEditor = ({ kidProfiles }) => {
                   {/* Real Ad Slot */}
                   <div style={{ position: 'relative', zIndex: 1 }}>
                     <ins className="adsbygoogle"
-                         style={{ display: 'block' }}
-                         data-ad-client="ca-pub-7219615724537453"
-                         data-ad-slot="8310836177"
-                         data-ad-format="auto"
-                         data-full-width-responsive="true"></ins>
+                      style={{ display: 'block' }}
+                      data-ad-client="ca-pub-7219615724537453"
+                      data-ad-slot="8310836177"
+                      data-ad-format="auto"
+                      data-full-width-responsive="true"></ins>
                   </div>
-                  
+
                   {/* Test Fallback (Visible if real ad is blank or blocked) */}
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa', border: '1px solid #dee2e6' }}>
                     <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #eee 25%, transparent 25%, transparent 50%, #eee 50%, #eee 75%, transparent 75%, transparent)', backgroundSize: '20px 20px', opacity: 0.1, position: 'absolute' }}></div>
@@ -1005,7 +1015,7 @@ const PhotoEditor = ({ kidProfiles }) => {
               <span style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', fontWeight: 600 }}>✦ Custom overrides active</span>
             )}
           </div>
-          <button onClick={() => { handleUndo(); trackEvent(ANALYTICS_EVENTS.UNDO_CLICK); }} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14}/> Undo</button>
+          <button onClick={() => { handleUndo(); trackEvent(ANALYTICS_EVENTS.UNDO_CLICK); }} disabled={history.length === 0} className="secondary-btn" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><RotateCcw size={14} /> Undo</button>
         </div>
 
         <div className="toolbar-section">
@@ -1013,21 +1023,21 @@ const PhotoEditor = ({ kidProfiles }) => {
             <label>Show on Photo</label>
             <DefaultToggle section="visibility" />
             <div className="overlay-toggle-row">
-              <button 
+              <button
                 className={`overlay-toggle ${currentOverlays.showName ? 'active' : ''}`}
                 onClick={() => {
                   updateStyle('showName', !currentOverlays.showName);
                   trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'showName', value: !currentOverlays.showName });
                 }}
               >🏷️ Tags</button>
-              <button 
+              <button
                 className={`overlay-toggle ${currentOverlays.showDate ? 'active' : ''}`}
                 onClick={() => {
                   updateStyle('showDate', !currentOverlays.showDate);
                   trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'showDate', value: !currentOverlays.showDate });
                 }}
               >📅 Date</button>
-              <button 
+              <button
                 className={`overlay-toggle ${currentOverlays.showLocation ? 'active' : ''}`}
                 onClick={() => {
                   updateStyle('showLocation', !currentOverlays.showLocation);
@@ -1036,18 +1046,18 @@ const PhotoEditor = ({ kidProfiles }) => {
               >📍 Place</button>
             </div>
 
-            
+
             {currentOverlays.showName && kidProfiles.length > 0 && (
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
                 {kidProfiles.map((evt, index) => {
                   const name = evt.name || `Event ${index + 1}`;
                   const isActive = !currentOverlays.hiddenNames.includes(index);
                   return (
-                    <button 
+                    <button
                       key={index}
                       className={`overlay-toggle ${isActive ? 'active' : ''}`}
                       onClick={() => {
-                        const hidden = isActive 
+                        const hidden = isActive
                           ? [...currentOverlays.hiddenNames, index]
                           : currentOverlays.hiddenNames.filter(idx => idx !== index);
                         updateStyle('hiddenNames', hidden);
@@ -1069,8 +1079,8 @@ const PhotoEditor = ({ kidProfiles }) => {
             <label><Type size={14} /> Font</label>
             <DefaultToggle section="font" />
             <div className="custom-select-container" ref={fontPickerRef}>
-              <button 
-                className="font-select-trigger" 
+              <button
+                className="font-select-trigger"
                 onClick={() => {
                   setIsFontPickerOpen(!isFontPickerOpen);
                   trackEvent(ANALYTICS_EVENTS.STYLE_TOGGLE, { field: 'font_picker', value: !isFontPickerOpen });
@@ -1082,13 +1092,13 @@ const PhotoEditor = ({ kidProfiles }) => {
               {isFontPickerOpen && (
                 <div className="font-options-dropdown">
                   {FONTS.map(f => (
-                    <div 
-                      key={f} 
+                    <div
+                      key={f}
                       className={`font-option ${currentOverlays.font === f ? 'active' : ''}`}
                       style={{ fontFamily: f }}
-                      onClick={() => { 
-                        updateStyle('font', f); 
-                        setIsFontPickerOpen(false); 
+                      onClick={() => {
+                        updateStyle('font', f);
+                        setIsFontPickerOpen(false);
                         trackEvent(ANALYTICS_EVENTS.FONT_CHANGE, { font: f });
                       }}
                     >
@@ -1103,10 +1113,10 @@ const PhotoEditor = ({ kidProfiles }) => {
           <div className="control-item">
             <label>Text Size</label>
             <DefaultToggle section="fontSize" />
-            <input 
-              type="range" min="10" max="300" 
-              value={currentFontSize} 
-              onChange={(e) => updateStyle('fontSize', parseInt(e.target.value))} 
+            <input
+              type="range" min="10" max="300"
+              value={currentFontSize}
+              onChange={(e) => updateStyle('fontSize', parseInt(e.target.value))}
             />
           </div>
 
@@ -1115,7 +1125,7 @@ const PhotoEditor = ({ kidProfiles }) => {
             <DefaultToggle section="color" />
             <div className="color-swatches" style={{ marginTop: '0.4rem' }}>
               {COLORS.map(c => (
-                <div 
+                <div
                   key={c}
                   className={`color-swatch ${currentOverlays.color === c ? 'active' : ''}`}
                   style={{ backgroundColor: c }}
@@ -1132,11 +1142,11 @@ const PhotoEditor = ({ kidProfiles }) => {
             <label>Text Rotation</label>
             <DefaultToggle section="rotations" />
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <input 
+              <input
                 style={{ flex: 1 }}
-                type="range" min="-180" max="180" 
-                value={currentRotations.textGroup ?? 0} 
-                onChange={(e) => updateOverride('rotations', r => ({ ...r, textGroup: parseInt(e.target.value) }))} 
+                type="range" min="-180" max="180"
+                value={currentRotations.textGroup ?? 0}
+                onChange={(e) => updateOverride('rotations', r => ({ ...r, textGroup: parseInt(e.target.value) }))}
                 onMouseUp={saveHistory}
                 onTouchEnd={saveHistory}
               />
@@ -1149,7 +1159,7 @@ const PhotoEditor = ({ kidProfiles }) => {
           <div className="control-item">
             <label>📅 Date Fallback</label>
             <DefaultToggle section="customPhotoDate" />
-            <input 
+            <input
               type="date"
               value={currentOverlays.customPhotoDate || ''}
               onChange={(e) => updateStyle('customPhotoDate', e.target.value)}
@@ -1167,9 +1177,9 @@ const PhotoEditor = ({ kidProfiles }) => {
 
           <div className="control-item">
             <label><MapPin size={14} /> Custom Location (This Photo)</label>
-            <input 
-              type="text" 
-              placeholder="Ex: Hanoi, Vietnam" 
+            <input
+              type="text"
+              placeholder="Ex: Hanoi, Vietnam"
               value={currentCustomLoc ?? ''}
               onChange={(e) => updateOverride('customLocation', () => e.target.value)}
               onBlur={saveHistory}
@@ -1179,7 +1189,7 @@ const PhotoEditor = ({ kidProfiles }) => {
           <div className="control-item">
             <label>Location Auto-Format</label>
             <DefaultToggle section="locationDetailMode" />
-            <select 
+            <select
               value={currentOverlays.locationDetailMode}
               onChange={e => updateStyle('locationDetailMode', e.target.value)}
               style={{ width: '100%', padding: '0.6rem', borderRadius: '0.8rem', border: '1px solid var(--glass-border)', fontFamily: 'Outfit, sans-serif' }}
@@ -1197,8 +1207,8 @@ const PhotoEditor = ({ kidProfiles }) => {
             <DefaultToggle section="selectedIcons" />
             <div className="icon-grid">
               {CUTE_ICONS.map(icon => (
-                <button 
-                  key={icon.id} 
+                <button
+                  key={icon.id}
                   className="icon-btn"
                   onClick={() => {
                     const newId = `${icon.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -1221,14 +1231,14 @@ const PhotoEditor = ({ kidProfiles }) => {
                   {(currentOverlays.selectedIcons || []).map((s) => {
                     const iconMap = { heart: '❤️', star: '⭐', sun: '☀️', cloud: '☁️', moon: '🌙', music: '🎵', sparkles: '✨', camera: '📸', umbrella: '☔', plane: '✈️', zap: '⚡', smile: '😊' };
                     return (
-                      <button 
-                        key={s.id} 
+                      <button
+                        key={s.id}
                         onClick={() => {
                           saveHistory();
                           updateStyle('selectedIcons', currentOverlays.selectedIcons.filter(x => x.id !== s.id));
                           trackEvent(ANALYTICS_EVENTS.STICKER_REMOVE, { tag_id: s.id });
-                        }} 
-                        className="overlay-toggle active" 
+                        }}
+                        className="overlay-toggle active"
                         style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
                         {iconMap[s.type] || s.type} ✕
@@ -1236,16 +1246,16 @@ const PhotoEditor = ({ kidProfiles }) => {
                     );
                   })}
                 </div>
-                <button 
-                  className="secondary-btn" 
-                  onClick={() => { 
-                    saveHistory(); 
-                    updateStyle('selectedIcons', []); 
+                <button
+                  className="secondary-btn"
+                  onClick={() => {
+                    saveHistory();
+                    updateStyle('selectedIcons', []);
                     trackEvent(ANALYTICS_EVENTS.STICKER_CLEAR);
                   }}
                   style={{ marginTop: '0.8rem', width: '100%', fontSize: '0.82rem', padding: '0.4rem' }}
                 >
-                  <Trash2 size={12}/> Clear All
+                  <Trash2 size={12} /> Clear All
                 </button>
               </div>
             )}
@@ -1255,8 +1265,8 @@ const PhotoEditor = ({ kidProfiles }) => {
         <div className="actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
             <button className="secondary-btn" onClick={() => {
-              setFiles([]); 
-              setCache({}); 
+              setFiles([]);
+              setCache({});
               trackEvent(ANALYTICS_EVENTS.RESET_ALL);
             }} style={{ flex: 1 }}>
               <Trash2 size={16} /> Reset
