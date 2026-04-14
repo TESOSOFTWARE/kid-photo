@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Heart, User, Sliders, Image } from 'lucide-react'
+import { User, Sliders, Image } from 'lucide-react'
 import TagManager from './components/TagManager'
 import PhotoEditor from './components/PhotoEditor'
+import BrandLogo from './components/BrandLogo'
 import { trackEvent, ANALYTICS_EVENTS } from './utils/analytics.js'
 
 function App() {
@@ -14,7 +15,7 @@ function App() {
       {/* ── Desktop layout ── */}
       <aside className="sidebar">
         <header className="app-header">
-          <Heart className="logo-icon" size={36} fill="var(--primary)" color="var(--primary)" />
+          <BrandLogo className="logo-icon" size={42} />
           <div>
             <h1>TinyTag</h1>
             <p className="subtitle">Little moments, lasting memories</p>
@@ -29,7 +30,7 @@ function App() {
       {/* ── Mobile layout ── */}
       <div className="mobile-top-bar">
         <div className="mobile-logo">
-          <Heart size={22} fill="var(--primary)" color="var(--primary)" />
+          <BrandLogo size={24} />
           <span>TinyTag</span>
         </div>
         <div className="mobile-tabs">
