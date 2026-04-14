@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { extractMetadata } from '../services/exif-service';
 import { calculateAge, formatAge, formatDate, calculateDiff, getNextRecurringDate, parseLocalDateTime } from '../utils/date-utils';
-import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap, Check } from 'lucide-react';
+import { Download, Plus, Trash2, Type, MapPin, Smile, Heart, Star, Sun, Cloud, ChevronLeft, ChevronRight, Layers, RotateCcw, Moon, Music, Sparkles, Camera, Umbrella, Plane, Zap, Check, Clock, Activity } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import heic2any from 'heic2any';
 import { trackEvent, ANALYTICS_EVENTS } from '../utils/analytics.js';
@@ -24,7 +24,7 @@ const CUTE_ICONS = [
 const FONTS = ['Outfit', 'Inter', 'Pacifico', 'Comfortaa', 'Fredoka', 'Sniglet', 'Itim', 'VT323', 'cursive', 'serif'];
 const COLORS = ['#ffffff', '#ff6b6b', '#fcc419', '#339af0', '#51cf66', '#845ef7', '#333333'];
 
-const PhotoEditor = ({ kidProfiles }) => {
+const PhotoEditor = ({ kidProfiles, currentSegment, onAddTag }) => {
   const canvasRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -173,7 +173,11 @@ const PhotoEditor = ({ kidProfiles }) => {
   const handleFileChange = (e) => {
     let selected = Array.from(e.target.files);
     if (!selected.length) return;
+    addFilesToEditor(selected);
+    e.target.value = '';
+  };
 
+  const addFilesToEditor = (selected) => {
     // Reset watermark if adding new photos to force monetization for each batch
     setWatermarkRemoved(false);
     localStorage.setItem('tiny-watermark-removed', 'false');
@@ -196,7 +200,6 @@ const PhotoEditor = ({ kidProfiles }) => {
 
     setFiles(prev => [...prev, ...selected]);
     setCurrentIndex(oldLength);
-    e.target.value = '';
 
     trackEvent(ANALYTICS_EVENTS.UPLOAD_PHOTOS, { count: selected.length });
 
@@ -207,6 +210,21 @@ const PhotoEditor = ({ kidProfiles }) => {
         setTimeout(() => processFile(f, oldLength + i), 100 * (i + 1));
       }
     });
+  };
+
+  const handleTrySample = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(currentSegment.demoImage);
+      const blob = await response.blob();
+      const file = new File([blob], "demo-photo.jpg", { type: "image/jpeg" });
+      addFilesToEditor([file]);
+      if (onAddTag) onAddTag(currentSegment.sampleTag);
+    } catch (err) {
+      console.error("Error loading sample photo:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const removePhoto = (idx) => {
@@ -800,26 +818,18 @@ const PhotoEditor = ({ kidProfiles }) => {
 
         {files.length === 0 ? (
           <div className="welcome-hero">
-            <span className="hero-tagline">✨ Milestone & Age Tracker for Parents</span>
-            <h1>Preserve Every Tiny Moment</h1>
-            <p className="subtitle">Automatically add date, location, and text to photos. Batch edit multiple images at once. Track milestones, ages, and countdowns — perfect for parenting memories and everyday moments</p>
+            <span className="hero-tagline">{currentSegment.tagline}</span>
+            <h1>{currentSegment.title}</h1>
+            <p className="subtitle">{currentSegment.subtitle}</p>
 
             <div className="hero-steps">
-              <div className="step-card">
-                <div className="step-icon"><Sparkles size={24} /></div>
-                <h3>1. Create Milestones</h3>
-                <p>Add birth dates, relationship anniversaries, or wedding dates in the sidebar.</p>
-              </div>
-              <div className="step-card">
-                <div className="step-icon"><Camera size={24} /></div>
-                <h3>2. Select Photos</h3>
-                <p>Upload your favorite snaps. Auto-calculate years, months, and days since your start date.</p>
-              </div>
-              <div className="step-card">
-                <div className="step-icon"><Check size={24} /></div>
-                <h3>3. Beautiful Outfits</h3>
-                <p>Overlay growth milestones or count down to big events with gorgeous, private tags.</p>
-              </div>
+              {currentSegment.steps.map((step, i) => (
+                <div key={i} className="step-card">
+                  <div className="step-icon"><step.icon size={24} /></div>
+                  <h3>{step.title}</h3>
+                  <p>{step.desc}</p>
+                </div>
+              ))}
             </div>
 
             <div className="usage-ideas" style={{ margin: '0 0 2rem', width: '100%', textAlign: 'center' }}>
@@ -833,13 +843,42 @@ const PhotoEditor = ({ kidProfiles }) => {
             </div>
 
             <div className="hero-cta-group">
+              <div className="mode-selection-grid">
+                <p className="selection-title">What are you tracking?</p>
+                <div className="selection-cards">
+                  <div className={`selection-card ${currentSegment.key === 'baby' ? 'active' : ''}`} onClick={() => window.location.search = '?mode=baby'}>
+                    <div className="card-icon"><Sparkles size={24} /></div>
+                    <span>Parenting</span>
+                  </div>
+                  <div className={`selection-card ${currentSegment.key === 'love' ? 'active' : ''}`} onClick={() => window.location.search = '?mode=love'}>
+                    <div className="card-icon"><Heart size={24} /></div>
+                    <span>Love</span>
+                  </div>
+                  <div className={`selection-card ${currentSegment.key === 'travel' ? 'active' : ''}`} onClick={() => window.location.search = '?mode=travel'}>
+                    <div className="card-icon"><MapPin size={24} /></div>
+                    <span>Travel</span>
+                  </div>
+                  <div className={`selection-card ${currentSegment.key === 'general' ? 'active' : ''}`} onClick={() => window.location.search = '?mode=general'}>
+                    <div className="card-icon"><Clock size={24} /></div>
+                    <span>Other</span>
+                  </div>
+                </div>
+              </div>
+
               <label
                 className="primary-btn hero-upload-btn"
                 htmlFor="file-input"
                 onClick={() => trackEvent(ANALYTICS_EVENTS.NAV_PHOTO_THUMB, { context: 'hero' })}
               >
-                <Download size={22} /> Select Photos to Start
+                <Download size={22} /> {files.length > 0 ? 'Add More Photos' : 'Select Photos to Start'}
               </label>
+              <button 
+                className="secondary-btn" 
+                onClick={handleTrySample}
+                style={{ borderRadius: '4rem', padding: '1rem 2rem', fontSize: '1.05rem', border: '1px solid var(--primary)' }}
+              >
+                📸 Try with Demo
+              </button>
               <div className="privacy-notice">
                 <Sparkles size={14} /> 100% Private: Your photos never leave your device.
               </div>

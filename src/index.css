@@ -1462,3 +1462,171 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
     font-size: 1.1rem;
   }
 }
+
+/* ── Mode Selection UI ── */
+.mode-switcher {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.switcher-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.mode-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  padding: 0.25rem;
+  background: rgba(0,0,0,0.04);
+  border-radius: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mode-pill {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.25rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.mode-pill.active {
+  background: white;
+  color: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Mini version for mobile header - stay in one row */
+.mode-pills.mini {
+  display: flex !important;
+  flex-direction: row;
+  grid-template-columns: none;
+  background: rgba(0,0,0,0.05);
+  padding: 0.15rem;
+  border-radius: 2rem;
+}
+
+.mode-pills.mini .mode-pill {
+  padding: 0.4rem;
+  flex: 1;
+}
+
+/* Mode Selection Grid in Hero */
+.mode-selection-grid {
+  width: 100%;
+  margin-bottom: 2.5rem;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.selection-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+  margin-bottom: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.selection-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .selection-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.selection-card {
+  padding: 1.5rem 1rem;
+  background: white;
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.selection-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
+}
+
+.selection-card.active {
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--primary-light);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: all 0.3s ease;
+}
+
+.selection-card:hover .card-icon {
+  background: var(--primary);
+  color: white;
+  transform: rotate(5deg) scale(1.1);
+}
+
+.selection-card span {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mobile-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: 0.5rem;
+}
+
+/* Mobile responsive for grid */
+@media (max-width: 600px) {
+  .selection-cards {
+    grid-template-columns: 1fr;
+  }
+  .selection-card {
+    flex-direction: row;
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+  }
+}
