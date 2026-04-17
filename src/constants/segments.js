@@ -71,7 +71,7 @@ export const SEGMENTS = {
       prefix: 'Together for',
       label: ''
     },
-    demoImage: 'https://images.unsplash.com/photo-1516589174184-c68526514ec0?auto=format&fit=crop&q=80&w=1200'
+    demoImage: 'https://images.unsplash.com/photo-1541089404510-5c9a779841fc?q=80&w=2000&auto=format&fit=crop'
   },
   travel: {
     key: 'travel',
