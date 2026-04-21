@@ -1198,11 +1198,26 @@ const PhotoEditor = ({ kidProfiles, currentSegment, onAddTag }) => {
           <div className="control-item">
             <label>📅 Date Fallback</label>
             <DefaultToggle section="customPhotoDate" />
-            <input
-              type="date"
-              value={currentOverlays.customPhotoDate || ''}
-              onChange={(e) => updateStyle('customPhotoDate', e.target.value)}
-            />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="datetime-local"
+                value={currentOverlays.customPhotoDate || ''}
+                onChange={(e) => updateStyle('customPhotoDate', e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button 
+                className="secondary-btn"
+                onClick={() => {
+                  const now = new Date();
+                  const offset = now.getTimezoneOffset() * 60000;
+                  const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
+                  updateStyle('customPhotoDate', localISOTime);
+                }}
+                style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+              >
+                Now
+              </button>
+            </div>
             {currentOverlays.customPhotoDate ? (
               <p style={{ fontSize: '0.72rem', color: 'var(--primary-dark)', fontWeight: 600 }}>
                 ✓ Priority: Date Fallback
